@@ -1,4 +1,6 @@
 mod mango;
+mod services;
+mod coordinator;
 
 use clap::{Args, Parser, Subcommand};
 use mango_v4_client::{
@@ -160,12 +162,15 @@ impl Rpc {
 }
 
 
-
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
     );
+
+    // TODO make it smarter
+    tokio::spawn(coordinator::run_coordinator_service());
+
 
     let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
