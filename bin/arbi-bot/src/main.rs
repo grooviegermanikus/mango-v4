@@ -23,17 +23,6 @@ use fixed::types::I80F48;
 use mango_v4::state::{PerpMarket, PlaceOrderType, QUOTE_DECIMALS, Side};
 use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 
-
-#[derive(Parser, Debug)]
-#[clap()]
-struct CliDotenv {
-    // When --dotenv <file> is passed, read the specified dotenv file before parsing args
-    #[clap(long)]
-    dotenv: std::path::PathBuf,
-
-    remaining_args: Vec<std::ffi::OsString>,
-}
-
 #[derive(Parser, Debug, Clone)]
 #[clap()]
 struct Cli {
@@ -50,117 +39,6 @@ struct Cli {
     // command: Command,
 }
 
-#[derive(Args, Debug, Clone)]
-struct Rpc {
-    #[clap(short, long, default_value = "m")]
-    url: String,
-
-    #[clap(short, long, default_value = "")]
-    fee_payer: String,
-}
-
-#[derive(Args, Debug, Clone)]
-struct CreateAccount {
-    #[clap(short, long)]
-    group: String,
-
-    /// also pays for everything
-    #[clap(short, long)]
-    owner: String,
-
-    #[clap(short, long)]
-    account_num: Option<u32>,
-
-    #[clap(short, long, default_value = "")]
-    name: String,
-
-    #[clap(flatten)]
-    rpc: Rpc,
-}
-
-#[derive(Args, Debug, Clone)]
-struct Deposit {
-    #[clap(long)]
-    account: String,
-
-    /// also pays for everything
-    #[clap(short, long)]
-    owner: String,
-
-    #[clap(short, long)]
-    mint: String,
-
-    #[clap(short, long)]
-    amount: u64,
-
-    #[clap(flatten)]
-    rpc: Rpc,
-}
-
-#[derive(Args, Debug, Clone)]
-struct JupiterSwap {
-    #[clap(long)]
-    account: String,
-
-    /// also pays for everything
-    #[clap(short, long)]
-    owner: String,
-
-    #[clap(long)]
-    input_mint: String,
-
-    #[clap(long)]
-    output_mint: String,
-
-    #[clap(short, long)]
-    amount: u64,
-
-    #[clap(short, long)]
-    slippage_bps: u64,
-
-    #[clap(flatten)]
-    rpc: Rpc,
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum Command {
-    CreateAccount(CreateAccount),
-    Deposit(Deposit),
-    JupiterSwap(JupiterSwap),
-    GroupAddress {
-        #[clap(short, long)]
-        creator: String,
-
-        #[clap(short, long, default_value = "0")]
-        num: u32,
-    },
-    MangoAccountAddress {
-        #[clap(short, long)]
-        group: String,
-
-        #[clap(short, long)]
-        owner: String,
-
-        #[clap(short, long, default_value = "0")]
-        num: u32,
-    },
-}
-
-impl Rpc {
-    fn client(&self, override_fee_payer: Option<&str>) -> anyhow::Result<Client> {
-        let fee_payer = keypair_from_cli(override_fee_payer.unwrap_or(&self.fee_payer));
-        Ok(Client::new(
-            anchor_client::Cluster::from_str(&self.url)?,
-            solana_sdk::commitment_config::CommitmentConfig::confirmed(),
-            Arc::new(fee_payer),
-            None,
-            TransactionBuilderConfig {
-                prioritization_micro_lamports: Some(5),
-            },
-        ))
-    }
-}
-
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -172,15 +50,7 @@ async fn main() -> Result<(), anyhow::Error> {
     tokio::spawn(coordinator::run_coordinator_service());
 
 
-    let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
-        dotenv::from_path(cli_dotenv.dotenv)?;
-        cli_dotenv.remaining_args
-    } else {
-        dotenv::dotenv().ok();
-        std::env::args_os().collect()
-    };
-
-    let cli = Cli::parse_from(args);
+    let cli = Cli::parse_from(std::env::args_os());
 
 
     let rpc_url = cli.rpc_url;
