@@ -1,10 +1,10 @@
 [package]
-name = "mango-v4-foo"
-version = "0.3.0"
+name = "mango-v4-arbi-bot"
+version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "foo"
+name = "arbi-bot"
 path = "src/main.rs"
 
 [dependencies]
