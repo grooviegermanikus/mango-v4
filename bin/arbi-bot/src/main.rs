@@ -1,3 +1,5 @@
+mod mango;
+
 use clap::{Args, Parser, Subcommand};
 use mango_v4_client::{
     keypair_from_cli, pubkey_from_cli, Client, JupiterSwapMode, MangoClient,
@@ -17,6 +19,7 @@ use fixed::FixedI128;
 use fixed::types::extra::U48;
 use fixed::types::I80F48;
 use mango_v4::state::{PerpMarket, PlaceOrderType, QUOTE_DECIMALS, Side};
+use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 
 
 #[derive(Parser, Debug)]
@@ -178,9 +181,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
 
-    // TODO get from cli
     // from app mango -> "Accounts"
-    let mango_account = Pubkey::from_str("G3bTQi9vjC1ggTMm89Guus9a2BpsxizPg6gkiK6RiVkC").unwrap();
     // https://mango.devnet.rpcpool.com
 
     // use private key (solana-keygen)
@@ -204,7 +205,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     prioritization_micro_lamports: Some(1),
                 },
             ),
-            mango_account,
+            cli.mango_account,
             owner.clone(),
         ).await?);
 
@@ -224,7 +225,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
 
     let order_size_lots = native_amount_to_lot(&perp_market, 0.0001);
-    println!("order size: {}", order_size_lots);
+    println!("order size buy: {}", order_size_lots);
 
     let sig = mango_client.perp_place_order(
         market_index.clone(),
@@ -238,7 +239,20 @@ async fn main() -> Result<(), anyhow::Error> {
         64 // max num orders to be skipped based on expiry information in the orderbook
     ).await;
 
-    println!("sig: {:?}", sig);
+    println!("sig buy: {:?}", sig);
+
+    // fails for delegate account
+    // let order_size_sell = native_amount(&perp_market, 0.0001);
+    // println!("order size sell: {:?}", order_size_sell);
+    // let sig_sell = mango_client.jupiter_swap(
+    //     Pubkey::from_str(MINT_ADDRESS_ETH).unwrap(),
+    //     Pubkey::from_str(MINT_ADDRESS_USDC).unwrap(),
+    //     order_size_sell,
+    //     10, // TODO 0.1%, 100=1% make configurable
+    //     JupiterSwapMode::ExactIn
+    // ).await;
+    //
+    // println!("sig sell: {:?}", sig_sell);
 
    Ok(())
 
@@ -275,6 +289,15 @@ fn native_amount_to_lot(lot_conf: &dyn LotConversion, amount: f64) -> i64 {
 
     exact.to_num::<f64>().round() as i64
 }
+
+fn native_amount(lot_conf: &dyn LotConversion, amount: f64) -> u64 {
+    let order_size = I80F48::from_num(amount);
+
+    let exact = order_size * I80F48::from_num(10u64.pow(lot_conf.get_base_decimals()));
+
+    exact.to_num::<f64>().round() as u64
+}
+
 
 fn quote_amount_to_lot(lot_conf: &dyn LotConversion, amount: f64) -> i64 {
     // quote_decimals always 6
