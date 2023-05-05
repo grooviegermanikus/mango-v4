@@ -36,6 +36,7 @@ use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::jupiter;
 
 use anyhow::Context;
+use log::warn;
 use solana_sdk::account::ReadableAccount;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
@@ -237,7 +238,7 @@ impl MangoClient {
             account_fetcher_fetch_mango_account(&*account_fetcher, &account).await?;
         let group = mango_account.fixed.group;
         if mango_account.fixed.owner != owner.pubkey() {
-            anyhow::bail!(
+            warn!(
                 "bad owner for account: expected {} got {}",
                 mango_account.fixed.owner,
                 owner.pubkey()
