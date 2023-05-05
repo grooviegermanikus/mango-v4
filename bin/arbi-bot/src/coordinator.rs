@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -24,6 +25,7 @@ struct Coordinator {
 }
 
 pub async fn run_coordinator_service() {
+
     let (buy_price_xwrite, mut buy_price_xread) = unbounded_channel();
 
     let mut coo = Coordinator {
