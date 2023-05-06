@@ -13,43 +13,45 @@ pub struct BuyPrice {
     pub approx_timestamp: Instant,
 }
 
-
 // e.g. 0.18USD for 0.0001 ETH
+// max(sell)
 fn calc_price_exactin(response: Vec<SwapQueryResult>) -> f64 {
-    let route_with_highest_buy_price = response.into_iter()
-        .max_by(|x, y|
-            OrderedFloat(x.out_amount).cmp(&OrderedFloat(y.out_amount))
-        )
-        .expect("no outAmounts found");
+    for ref x in &response {
+        println!("response i: {:?}", x.in_amount);
+        println!("response o: {:?}", x.out_amount);
 
-    // should be same as requested amount (100000000)
-    let in_amount = route_with_highest_buy_price.in_amount;
-    let out_amount = route_with_highest_buy_price.out_amount;
-
+        // response i: 1000000.0
+        // response o: 51525.0
+    }
     let usd_decimals = 6;
     let eth_decimals = 8;
     let decimals = eth_decimals - usd_decimals;
     let multiplier = 10f64.powf(decimals.into()) as f64;
-    in_amount as f64 / out_amount as f64 * multiplier
+
+    response.into_iter()
+        .map(|route| {
+            route.in_amount as f64 / route.out_amount as f64 * multiplier
+        })
+        .max_by_key(|price| OrderedFloat(*price))
+        .expect("no outAmounts found")
+
 }
 
-
 // e.g. price(USD) for 1 ETH asking for 0.001 ETH
+// min(buy)
 fn calc_price_exactout(response: Vec<SwapQueryResult>) -> f64 {
-    let route_with_highest_buy_price = response.into_iter()
-        .min_by(|x, y|
-            OrderedFloat(x.in_amount).cmp(&OrderedFloat(y.in_amount))
-        )
-        .expect("no inAmounts found");
-
-    let in_amount = route_with_highest_buy_price.in_amount;
-    let out_amount = route_with_highest_buy_price.out_amount;
-
     let usd_decimals = 6;
     let eth_decimals = 8;
     let decimals = eth_decimals - usd_decimals;
     let multiplier = 10f64.powf(decimals.into()) as f64;
-    in_amount as f64 / out_amount as f64 * multiplier
+
+    response.into_iter()
+        .map(|route| {
+            route.in_amount as f64 / route.out_amount as f64 * multiplier
+        })
+        .min_by_key(|price| OrderedFloat(*price))
+        .expect("no inAmounts found")
+
 }
 
 // see mango-v4 lib/client/src/jupiter.rs
