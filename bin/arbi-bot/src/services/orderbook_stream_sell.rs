@@ -68,6 +68,7 @@ struct Orderbook {
 }
 
 impl Orderbook {
+
     fn update_bid_price(&mut self, price: f64, quantity: f64) {
         let price = OrderedFloat(price);
         if quantity != 0.0 {
@@ -76,6 +77,7 @@ impl Orderbook {
             self.bids.remove(&price);
         }
     }
+
     fn update_ask_price(&mut self, price: f64, quantity: f64) {
         let price = OrderedFloat(price);
         if quantity != 0.0 {
@@ -84,19 +86,17 @@ impl Orderbook {
             self.asks.remove(&price);
         }
     }
+
     fn dump(&self) {
-        info!("orderbook asks {:?}", self.asks.iter().map(|(k, v)| (k.0, v)).collect::<Vec<_>>());
         info!("orderbook bids {:?}", self.bids.iter().map(|(k, v)| (k.0, v)).collect::<Vec<_>>());
-
-
+        info!("orderbook asks {:?}", self.asks.iter().map(|(k, v)| (k.0, v)).collect::<Vec<_>>());
     }
-
 }
 
 // requires running "service-mango-orderbook" - see README
 pub async fn listen_orderbook_feed(market_id: &str,
-                                   lowest_ask_price: Arc<RwLock<Option<f64>>>,
-                                   lowest_bid_price: Arc<RwLock<Option<f64>>>) {
+                                   lowest_bid_price: Arc<RwLock<Option<f64>>>,
+                                   lowest_ask_price: Arc<RwLock<Option<f64>>>) {
 
     let (mut socket, response) =
         connect(Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap()).expect("Can't connect");
@@ -153,6 +153,20 @@ pub async fn listen_orderbook_feed(market_id: &str,
 
         if is_checkpoint_message {
             let checkpoint: OrderbookCheckpoint = serde_json::from_value(plain.clone()).expect("");
+
+            for bid in checkpoint.bids {
+                let price = SellPrice {
+                    price: bid[0],
+                    quantity: bid[1],
+                    // TODO derive from slot
+                    approx_timestamp: Instant::now(),
+                };
+                orderbook.update_bid_price(price.price, price.quantity);
+                let mut lock = lowest_bid_price.write().await;
+                *lock = Some(price.price);
+                // sell_price_xwrite.send(price).unwrap();
+            }
+
             for ask in checkpoint.asks {
                 let price = SellPrice {
                     price: ask[0],
@@ -164,18 +178,6 @@ pub async fn listen_orderbook_feed(market_id: &str,
                 let mut lock = lowest_ask_price.write().await;
                 *lock = Some(price.price);
 
-                // sell_price_xwrite.send(price).unwrap();
-            }
-            for bid in checkpoint.bids {
-                let price = SellPrice {
-                    price: bid[0],
-                    quantity: bid[1],
-                    // TODO derive from slot
-                    approx_timestamp: Instant::now(),
-                };
-                orderbook.update_bid_price(price.price, price.quantity);
-                let mut lock = lowest_bid_price.write().await;
-                *lock = Some(price.price);
                 // sell_price_xwrite.send(price).unwrap();
             }
         }
@@ -190,14 +192,14 @@ pub async fn listen_orderbook_feed(market_id: &str,
                     quantity: data[1],
                     approx_timestamp: Instant::now(),
                 };
-                if update.side == OrderbookSide::Ask {
-                    orderbook.update_ask_price(price.price, price.quantity);
-                    let mut lock = lowest_ask_price.write().await;
-                    *lock = Some(price.price);
-                }
                 if update.side == OrderbookSide::Bid {
                     orderbook.update_bid_price(price.price, price.quantity);
                     let mut lock = lowest_bid_price.write().await;
+                    *lock = Some(price.price);
+                }
+                if update.side == OrderbookSide::Ask {
+                    orderbook.update_ask_price(price.price, price.quantity);
+                    let mut lock = lowest_ask_price.write().await;
                     *lock = Some(price.price);
                 }
 
@@ -208,13 +210,6 @@ pub async fn listen_orderbook_feed(market_id: &str,
 
         }
 
-
-
-        // Ok(Text("{\"market\":\"ESdnpnNLgTkBCZRuTJkZLi5wKEZ2z47SG3PJrhundSQ2\",\"side\":\"ask\",\"update\":[[21.62,0.0],[21.63,1.32]],\"slot\":191923195,\"write_version\":695276659185}"))d
-        // OrderbookLevel {
-        //     price: 21.62,
-        //     quantity: 0.0,
-        // }
     }
 
 

@@ -85,12 +85,14 @@ async fn main() -> Result<(), anyhow::Error> {
 
 
     // TODO make it smarter
-    tokio::spawn(coordinator::run_coordinator_service());
+    let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service());
 
-    buy_asset(mango_client.clone()).await;
-    sell_asset(mango_client.clone()).await;
+    // buy_asset(mango_client.clone()).await;
+    // sell_asset(mango_client.clone()).await;
 
-   Ok(())
+    coordinator_thread.await?;
+
+    Ok(())
 }
 
 async fn buy_asset(mango_client: Arc<MangoClient>) {
