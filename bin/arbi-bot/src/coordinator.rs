@@ -81,12 +81,8 @@ pub async fn run_coordinator_service() {
                 let orderbook_ask = last_ask_price.read().await;
                 info!("orderbook(perp) best ask {:?}", *orderbook_ask);
 
-                // from orderbook
-                // debug!("orderbook {:?}", orderbook_asks.iter().map(|(k, v)| (k.0, v)).collect::<Vec<_>>());
-                // info!("min ask price in orderbook {:?} (size={})", orderbook_asks.first_key_value().map(|p| p.0.0), orderbook_asks.len());
-
                 if let (Some(perp_bid), Some(swap_buy)) = (*orderbook_bid, latest_buy) {
-                    info!("perp-bid {:?} vs swap-buy {:?}, profit {:.2?}%", perp_bid, swap_buy.price, perp_bid - swap_buy.price);
+                    info!("perp-bid {:?} vs swap-buy {:?}, profit {:.2?}%", perp_bid, swap_buy.price, 100.0 * (perp_bid - swap_buy.price) / swap_buy.price);
                 }
 
                 interval.tick().await;
