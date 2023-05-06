@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Value};
@@ -62,29 +62,48 @@ struct Subscriptions {
 }
 
 #[derive(Default)]
-struct Orderbook {
+struct fOrderbook {
     pub bids: BTreeMap<OrderedFloat<f64>, f64>,
     pub asks: BTreeMap<OrderedFloat<f64>, f64>,
 }
 
-impl Orderbook {
+impl fOrderbook {
 
     fn update_bid_price(&mut self, price: f64, quantity: f64) {
+        assert!(quantity.is_sign_positive(), "bid quantity must be non-negative but was <{}>", price);
         let price = OrderedFloat(price);
         if quantity != 0.0 {
+            if !price.is_sign_positive() {
+                // TODO check: orderbook asks [(-9.223372036854774e16, 0.1), (1946.14, 0.0235), (1947.5, 0.2353), ...
+                warn!("bid price must be non-negative but was <{}>", price);
+                return;
+            }
             self.bids.insert(price, quantity);
         } else {
             self.bids.remove(&price);
         }
     }
 
+    fn get_highest_bid_price(&self) -> Option<f64> {
+        self.bids.last_key_value().map(|(k, _)| k.0)
+    }
+
     fn update_ask_price(&mut self, price: f64, quantity: f64) {
+        assert!(quantity.is_sign_positive(), "ask quantity must be non-negative but was <{}>", price);
         let price = OrderedFloat(price);
         if quantity != 0.0 {
+            if !price.is_sign_positive() {
+                warn!("ask price must be non-negative but was <{}>", price);
+                return;
+            }
             self.asks.insert(price, quantity);
         } else {
             self.asks.remove(&price);
         }
+    }
+
+    fn get_lowest_ask_price(&self) -> Option<f64> {
+        self.bids.first_key_value().map(|(k, _)| k.0)
     }
 
     fn dump(&self) {
@@ -95,7 +114,7 @@ impl Orderbook {
 
 // requires running "service-mango-orderbook" - see README
 pub async fn listen_orderbook_feed(market_id: &str,
-                                   lowest_bid_price: Arc<RwLock<Option<f64>>>,
+                                   highest_bid_price: Arc<RwLock<Option<f64>>>,
                                    lowest_ask_price: Arc<RwLock<Option<f64>>>) {
 
     let (mut socket, response) =
@@ -117,7 +136,7 @@ pub async fn listen_orderbook_feed(market_id: &str,
 
     socket.write_message(Message::text(json!(sub).to_string())).unwrap();
 
-    let mut orderbook: Orderbook = Orderbook::default();
+    let mut orderbook: fOrderbook = fOrderbook::default();
 
     loop {
         match socket.read_message() {
@@ -150,7 +169,6 @@ pub async fn listen_orderbook_feed(market_id: &str,
         // detect update messages
         let is_update_message = plain.get("update").is_some();
 
-
         if is_checkpoint_message {
             let checkpoint: OrderbookCheckpoint = serde_json::from_value(plain.clone()).expect("");
 
@@ -162,9 +180,8 @@ pub async fn listen_orderbook_feed(market_id: &str,
                     approx_timestamp: Instant::now(),
                 };
                 orderbook.update_bid_price(price.price, price.quantity);
-                let mut lock = lowest_bid_price.write().await;
-                *lock = Some(price.price);
-                // sell_price_xwrite.send(price).unwrap();
+                let mut lock = highest_bid_price.write().await;
+                *lock = orderbook.get_highest_bid_price();
             }
 
             for ask in checkpoint.asks {
@@ -176,9 +193,7 @@ pub async fn listen_orderbook_feed(market_id: &str,
                 };
                 orderbook.update_ask_price(price.price, price.quantity);
                 let mut lock = lowest_ask_price.write().await;
-                *lock = Some(price.price);
-
-                // sell_price_xwrite.send(price).unwrap();
+                *lock = orderbook.get_lowest_ask_price();
             }
         }
 
@@ -194,7 +209,7 @@ pub async fn listen_orderbook_feed(market_id: &str,
                 };
                 if update.side == OrderbookSide::Bid {
                     orderbook.update_bid_price(price.price, price.quantity);
-                    let mut lock = lowest_bid_price.write().await;
+                    let mut lock = highest_bid_price.write().await;
                     *lock = Some(price.price);
                 }
                 if update.side == OrderbookSide::Ask {
