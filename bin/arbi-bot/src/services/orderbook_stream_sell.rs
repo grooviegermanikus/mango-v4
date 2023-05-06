@@ -62,12 +62,12 @@ struct Subscriptions {
 }
 
 #[derive(Default)]
-struct fOrderbook {
+struct Orderbook {
     pub bids: BTreeMap<OrderedFloat<f64>, f64>,
     pub asks: BTreeMap<OrderedFloat<f64>, f64>,
 }
 
-impl fOrderbook {
+impl Orderbook {
 
     fn update_bid_price(&mut self, price: f64, quantity: f64) {
         assert!(quantity.is_sign_positive(), "bid quantity must be non-negative but was <{}>", price);
@@ -136,7 +136,7 @@ pub async fn listen_orderbook_feed(market_id: &str,
 
     socket.write_message(Message::text(json!(sub).to_string())).unwrap();
 
-    let mut orderbook: fOrderbook = fOrderbook::default();
+    let mut orderbook: Orderbook = Orderbook::default();
 
     loop {
         match socket.read_message() {
