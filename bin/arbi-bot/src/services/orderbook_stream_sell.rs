@@ -13,7 +13,7 @@ use tokio_tungstenite::tungstenite::client::connect_with_config;
 use url::Url;
 
 #[derive(Debug, Copy, Clone)]
-pub struct SellPrice {
+pub struct OrderstreamPrice {
     // ETH in USDC - 1901,59495311
     pub price: f64,
     pub quantity: f64,
@@ -103,12 +103,12 @@ impl Orderbook {
     }
 
     fn get_lowest_ask_price(&self) -> Option<f64> {
-        self.bids.first_key_value().map(|(k, _)| k.0)
+        self.asks.first_key_value().map(|(k, _)| k.0)
     }
 
     fn dump(&self) {
-        info!("orderbook bids {:?}", self.bids.iter().map(|(k, v)| (k.0, v)).collect::<Vec<_>>());
-        info!("orderbook asks {:?}", self.asks.iter().map(|(k, v)| (k.0, v)).collect::<Vec<_>>());
+        debug!("orderbook bids {:?}", self.bids.iter().map(|(k, v)| (k.0, v)).collect::<Vec<_>>());
+        debug!("orderbook asks {:?}", self.asks.iter().map(|(k, v)| (k.0, v)).collect::<Vec<_>>());
     }
 }
 
@@ -173,7 +173,7 @@ pub async fn listen_orderbook_feed(market_id: &str,
             let checkpoint: OrderbookCheckpoint = serde_json::from_value(plain.clone()).expect("");
 
             for bid in checkpoint.bids {
-                let price = SellPrice {
+                let price = OrderstreamPrice {
                     price: bid[0],
                     quantity: bid[1],
                     // TODO derive from slot
@@ -185,7 +185,7 @@ pub async fn listen_orderbook_feed(market_id: &str,
             }
 
             for ask in checkpoint.asks {
-                let price = SellPrice {
+                let price = OrderstreamPrice {
                     price: ask[0],
                     quantity: ask[1],
                     // TODO derive from slot
@@ -202,7 +202,7 @@ pub async fn listen_orderbook_feed(market_id: &str,
 
             debug!("update({:?}): {:?}", update.slot, update.update);
             for data in update.update {
-                let price = SellPrice {
+                let price = OrderstreamPrice {
                     price: data[0],
                     quantity: data[1],
                     approx_timestamp: Instant::now(),

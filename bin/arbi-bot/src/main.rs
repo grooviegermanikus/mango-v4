@@ -50,7 +50,8 @@ struct Cli {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV,
+                 "info,arbi_bot=debug"),
     );
 
 
@@ -117,7 +118,7 @@ async fn buy_asset(mango_client: Arc<MangoClient>) {
         64 // max num orders to be skipped based on expiry information in the orderbook
     ).await;
 
-    // println!("sig buy: {:?}", sig);
+    println!("sig buy: {:?}", sig);
 }
 
 // fails ATM due to delegate account

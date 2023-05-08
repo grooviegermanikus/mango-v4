@@ -5,10 +5,18 @@ use ordered_float::OrderedFloat;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
+use crate::services::orderbook_stream_sell::OrderstreamPrice;
 
 #[derive(Debug, Copy, Clone)]
 pub struct BuyPrice {
-    // USDC in ETH - 0,00052587
+    // ETH in USD - e.g 1900
+    pub price: f64,
+    pub approx_timestamp: Instant,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct SellPrice {
+    // ETH in USD - e.g 1900
     pub price: f64,
     pub approx_timestamp: Instant,
 }
@@ -16,13 +24,6 @@ pub struct BuyPrice {
 // e.g. 0.18USD for 0.0001 ETH
 // max(sell)
 fn calc_price_exactin(response: Vec<SwapQueryResult>) -> f64 {
-    for ref x in &response {
-        println!("response i: {:?}", x.in_amount);
-        println!("response o: {:?}", x.out_amount);
-
-        // response i: 1000000.0
-        // response o: 51525.0
-    }
     let usd_decimals = 6;
     let eth_decimals = 8;
     let decimals = eth_decimals - usd_decimals;
@@ -105,7 +106,7 @@ async fn call_exactin() -> anyhow::Result<Vec<SwapQueryResult>> {
     Ok(quote)
 }
 
-pub async fn call_buy_usd() -> BuyPrice {
+pub async fn call_buy() -> BuyPrice {
 
     match call_exactin().await {
         Ok(res) =>
@@ -148,11 +149,11 @@ async fn call_exactout() -> anyhow::Result<Vec<SwapQueryResult>> {
     Ok(quote)
 }
 
-pub async fn call_buy_eth() -> BuyPrice {
+pub async fn call_sell() -> SellPrice {
 
     match call_exactout().await {
         Ok(res) =>
-            BuyPrice {
+            SellPrice {
                 price: calc_price_exactout(res),
                 approx_timestamp: Instant::now(),
             },
@@ -163,7 +164,7 @@ pub async fn call_buy_eth() -> BuyPrice {
 }
 
 mod test {
-    use crate::services::asset_price_swap_buy::{calc_price_exactin, call_buy_usd, SwapQueryResult};
+    use crate::services::asset_price_swap::{calc_price_exactin, call_buy, SwapQueryResult};
 
     #[test]
     fn test_best_route_single() {
@@ -189,7 +190,7 @@ mod test {
 
     #[tokio::test]
     async fn test_call_buy_usd() {
-        let usd = call_buy_usd().await;
+        let usd = call_buy().await;
         // 0.00053364
         println!("USDETH: {:?}", usd);
     }
