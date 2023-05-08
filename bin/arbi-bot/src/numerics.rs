@@ -1,6 +1,7 @@
 use fixed::types::I80F48;
 use mango_v4::state::{PerpMarket, QUOTE_DECIMALS};
 
+#[derive(Debug, Copy, Clone)]
 pub struct ConversionConf {
     base_decimals: u32,
     base_lot_size: i64,
