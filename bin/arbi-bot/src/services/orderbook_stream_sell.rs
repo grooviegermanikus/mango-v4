@@ -50,7 +50,7 @@ struct OrderbookCheckpoint {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-struct WsSubscription {
+struct WsSubscriptionOrderbook {
     pub command: String,
     pub market_id: String,
 }
@@ -127,7 +127,7 @@ pub async fn listen_orderbook_feed(market_id: &str,
     // Response { status: 101, version: HTTP/1.1, headers: {"connection": "Upgrade", "upgrade": "websocket", "sec-websocket-accept": "ppgfXDDxtQBmL0eczLMf5VGbFIo="}, body: () }
 
     // subscriptions= {"command":"subscribe","marketId":"ESdnpnNLgTkBCZRuTJkZLi5wKEZ2z47SG3PJrhundSQ2"}
-    let sub = &WsSubscription {
+    let sub = &WsSubscriptionOrderbook {
         command: "subscribe".to_string(),
         market_id: market_id.to_string(),
     };
@@ -227,6 +227,92 @@ pub async fn listen_orderbook_feed(market_id: &str,
 
     }
 
+
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct WsSubscriptionFills {
+    pub command: String,
+    pub market_id: String,
+    pub head_updates: bool,
+}
+
+pub async fn listen_fills(market_id: &str) {
+    let (mut socket, response) =
+        connect(Url::parse("wss://api.mngo.cloud/fills/v1/").unwrap()).expect("Can't connect");
+    println!("Connected to the server: {:?}", response);
+
+    if response.status() != 101 {
+        // TODO implement reconnects
+        panic!("Error connecting to the server: {:?}", response);
+    }
+    let sub = &WsSubscriptionFills {
+        command: "subscribe".to_string(),
+        market_id: market_id.to_string(),
+        head_updates: true
+    };
+
+    socket.write_message(Message::text(json!(sub).to_string())).unwrap();
+
+    loop {
+        match socket.read_message() {
+            Ok(msg) => {
+                trace!("Received: {}", msg);
+                // https://github.com/blockworks-foundation/mango-v4/blob/max/mm/ts/client/scripts/mm/market-maker.ts#L724
+                println!("Received FILL: {}", msg)
+            }
+            Err(e) => {
+                match e {
+                    tungstenite::Error::ConnectionClosed => {
+                        error!("Connection closed");
+                        break;
+                    }
+                    _ => {}
+                }
+                error!("Error reading message: {:?}", e);
+                break;
+            }
+        }
+        let msg = socket.read_message().unwrap();
+
+        let msg = match msg {
+            tungstenite::Message::Text(s) => { s }
+            _ => continue
+        };
+
+        println!("Received FILL msg: {}", msg);
+
+        /*
+            {
+              "event": {
+                "eventType": "perp",
+                "maker": "9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2",
+                "taker": "G3bTQi9vjC1ggTMm89Guus9a2BpsxizPg6gkiK6RiVkC",
+                "takerSide": "bid",
+                "timestamp": "2023-05-08T09:16:13+00:00",
+                "seqNum": 62970,
+                "makerClientOrderId": 1683537372240897,
+                "takerClientOrderId": 1683537372242188,
+                "makerFee": -0.0003,
+                "takerFee": 0.0006,
+                "price": 1854.06,
+                "quantity": 0.0001
+              },
+              "marketKey": "Fgh9JSZ2qfSjCw9RPJ85W2xbihsp2muLvfRztzoVR7f1",
+              "marketName": "ETH-PERP",
+              "status": "new",
+              "slot": 192769877,
+              "writeVersion": 700671312884
+            }
+         */
+
+
+        let plain = from_str::<Value>(&msg).expect("Can't parse to JSON");
+
+
+        // TODO do something with the fill
+    }
 
 }
 

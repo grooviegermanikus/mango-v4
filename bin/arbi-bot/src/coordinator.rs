@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use log::{debug, info, trace};
 use mpsc::unbounded_channel;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{Barrier, mpsc, Mutex, RwLock};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::time::{interval, sleep};
 
@@ -12,6 +12,7 @@ use services::orderbook_stream_sell::listen_orderbook_feed;
 
 use crate::{mango, services};
 use crate::services::asset_price_swap::{BuyPrice, SellPrice};
+use crate::services::orderbook_stream_sell::listen_fills;
 
 const STARTUP_DELAY: Duration = Duration::from_secs(2);
 
@@ -66,14 +67,19 @@ pub async fn run_coordinator_service() {
         }
     });
 
-
-
     let poll_orderbook = tokio::spawn({
         let last_bid_price = coo.last_bid_price_shared.clone();
         let last_ask_price = coo.last_ask_price_shared.clone();
         async move {
             sleep(STARTUP_DELAY).await;
             listen_orderbook_feed(mango::MARKET_ETH_PERP, last_bid_price, last_ask_price).await;
+        }
+    });
+
+    let poll_fills = tokio::spawn({
+        async move {
+            sleep(STARTUP_DELAY).await;
+            listen_fills(mango::MARKET_ETH_PERP,).await;
         }
     });
 

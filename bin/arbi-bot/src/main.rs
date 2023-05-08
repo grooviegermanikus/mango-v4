@@ -12,6 +12,7 @@ use mango_v4_client::{
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant};
 use chrono::Utc;
 use futures::TryFutureExt;
@@ -88,8 +89,13 @@ async fn main() -> Result<(), anyhow::Error> {
     // TODO make it smarter
     let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service());
 
-    // buy_asset(mango_client.clone()).await;
+    // make sure the fillter thread is up
+    thread::sleep(Duration::from_secs(3));
+
+    buy_asset(mango_client.clone()).await;
     // sell_asset(mango_client.clone()).await;
+
+    mango_client.mango_account().await.unwrap().
 
     coordinator_thread.await?;
 
@@ -104,7 +110,7 @@ async fn buy_asset(mango_client: Arc<MangoClient>) {
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
 
     let order_size_lots = native_amount_to_lot(&perp_market, 0.0001);
-    println!("order size buy: {}", order_size_lots);
+    println!("order size buy (client id {}): {}", client_order_id, order_size_lots);
 
     let sig = mango_client.perp_place_order(
         market_index.clone(),
