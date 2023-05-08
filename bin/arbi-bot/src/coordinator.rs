@@ -16,8 +16,7 @@ use services::orderbook_stream_sell::listen_orderbook_feed;
 
 use crate::{mango, services};
 use crate::services::asset_price_swap::{BuyPrice, SellPrice};
-use crate::services::orderbook_stream_sell::{init_ws_subscription, block_fills_until_client_id};
-use crate::services::perp_orders::{buy_asset, sell_asset};
+use crate::services::perp_orders::{buy_asset, buy_asset_blocking_until_fill, sell_asset};
 
 const STARTUP_DELAY: Duration = Duration::from_secs(2);
 
@@ -139,7 +138,10 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                     let profit = (swap_sell.price - perp_ask) / perp_ask;
                     info!("swap-sell {:.2?} vs perp-ask {:.2?}, profit {:.2?}%", swap_sell.price, perp_ask, 100.0 * profit);
 
-                    trade_sequence(mango_client.clone()).await;
+                    if should_trade(profit) {
+                        info!("profitable trade detected, starting trade sequence ...");
+                        trade_sequence(mango_client.clone()).await;
+                    }
                 }
 
                 interval.tick().await;
@@ -167,15 +169,8 @@ async fn trade_sequence(mango_client: Arc<MangoClient>) {
     let client_order_id = Utc::now().timestamp_micros() as u64;
     debug!("starting trade sequence (client_order_id {}) ...", client_order_id);
 
-    // TODO wrap in type; pass in client_order_id
-    let mut web_socket = init_ws_subscription(&mango::MARKET_ETH_PERP);
-
     debug!("buying asset ...");
-    buy_asset(mango_client.clone(), client_order_id).await;
-
-    debug!("waiting for fill ...");
-    block_fills_until_client_id(
-        &mut web_socket, mango::MARKET_ETH_PERP, client_order_id).await.unwrap();
+    buy_asset_blocking_until_fill(&mango_client, client_order_id).await;
 
     debug!("selling asset ...");
     sell_asset(mango_client.clone()).await;
@@ -203,3 +198,6 @@ fn drain_sell_feed(feed: &mut UnboundedReceiver<SellPrice>) -> Option<SellPrice>
     latest
 }
 
+fn should_trade(profit: f64) -> bool {
+    profit > 0.01
+}
