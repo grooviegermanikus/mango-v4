@@ -9,20 +9,19 @@ use std::future::Future;
 use std::ops::Deref;
 use std::str::FromStr;
 use clap::{Args, Parser, Subcommand};
+use log::debug;
 use mango_v4_client::{
     keypair_from_cli, pubkey_from_cli, Client,
     TransactionBuilderConfig,
 };
 
-pub async fn buy_asset(mango_client: Arc<MangoClient>) {
-    // must be unique
-    let client_order_id = Utc::now().timestamp_micros();
+pub async fn buy_asset(mango_client: Arc<MangoClient>, client_order_id: u64) {
 
     let market_index = mango_client.context.perp_market_indexes_by_name.get("ETH-PERP").unwrap();
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
 
     let order_size_lots = native_amount_to_lot(perp_market.into(), 0.0001);
-    println!("order size buy (client id {}): {}", client_order_id, order_size_lots);
+    debug!("order size buy (client id {}): {}", client_order_id, order_size_lots);
 
     let sig = mango_client.perp_place_order(
         market_index.clone(),
@@ -36,7 +35,7 @@ pub async fn buy_asset(mango_client: Arc<MangoClient>) {
         64 // max num orders to be skipped based on expiry information in the orderbook
     ).await;
 
-    println!("sig buy: {:?}", sig);
+    debug!("sig buy: {:?}", sig);
 }
 
 // fails ATM due to delegate account
@@ -45,7 +44,7 @@ pub async fn sell_asset(mango_client: Arc<MangoClient>) {
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
 
     let order_size_sell = native_amount(perp_market.into(), 0.0001);
-    println!("order size sell: {:?}", order_size_sell);
+    debug!("order size sell: {:?}", order_size_sell);
     let sig_sell = mango_client.jupiter_swap(
         Pubkey::from_str(MINT_ADDRESS_ETH).unwrap(),
         Pubkey::from_str(MINT_ADDRESS_USDC).unwrap(),
@@ -54,5 +53,5 @@ pub async fn sell_asset(mango_client: Arc<MangoClient>) {
         JupiterSwapMode::ExactIn
     ).await;
 
-    println!("sig sell: {:?}", sig_sell);
+    debug!("sig sell: {:?}", sig_sell);
 }

@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar};
 use std::thread;
 use std::time::Duration;
+use chrono::Utc;
 
 use log::{debug, info, trace};
 use mpsc::unbounded_channel;
@@ -14,8 +16,8 @@ use services::orderbook_stream_sell::listen_orderbook_feed;
 
 use crate::{mango, services};
 use crate::services::asset_price_swap::{BuyPrice, SellPrice};
-use crate::services::orderbook_stream_sell::listen_fills;
-use crate::services::perp_orders::buy_asset;
+use crate::services::orderbook_stream_sell::{init_ws_subscription, block_fills_until_client_id};
+use crate::services::perp_orders::{buy_asset, sell_asset};
 
 const STARTUP_DELAY: Duration = Duration::from_secs(2);
 
@@ -79,12 +81,17 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
         }
     });
 
-    let poll_fills = tokio::spawn({
-        async move {
-            sleep(STARTUP_DELAY).await;
-            listen_fills(mango::MARKET_ETH_PERP,).await;
-        }
-    });
+    // // assume that client_order_id is in map
+    // let signal_order_fill : Arc<RwLock<HashMap<u64, Condvar>>> =
+    //     Arc::new(RwLock::new(HashMap::new()));
+
+    // let poll_fills = tokio::spawn({
+    //     let signal_order_fill_m = signal_order_fill.clone();
+    //     async move {
+    //         sleep(STARTUP_DELAY).await;
+    //         listen_fills_until_client_id(mango::MARKET_ETH_PERP, signal_order_fill_m.clone()).await;
+    //     }
+    // });
 
     // buy on jupiter, short on eth-perp
     let main_jup2perp_poller = tokio::spawn({
@@ -112,7 +119,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
         }
     });
 
-    // buy on jupiter, short on eth-perp
+    // buy on eth-perp, sell on jupiter
     let main_perp2jup_poller = tokio::spawn({
         let last_bid_price = coo.last_bid_price_shared.clone();
         let last_ask_price = coo.last_ask_price_shared.clone();
@@ -131,6 +138,8 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                 if let (Some(perp_ask), Some(swap_sell)) = (*orderbook_ask, latest_swap_sell) {
                     let profit = (swap_sell.price - perp_ask) / perp_ask;
                     info!("swap-sell {:.2?} vs perp-ask {:.2?}, profit {:.2?}%", swap_sell.price, perp_ask, 100.0 * profit);
+
+                    trade_sequence(mango_client.clone()).await;
                 }
 
                 interval.tick().await;
@@ -141,7 +150,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
     // make sure the fillter thread is up
     thread::sleep(Duration::from_secs(3));
 
-    buy_asset(mango_client.clone()).await;
+    // buy_asset(mango_client.clone()).await;
     // sell_asset(mango_client.clone()).await;
 
     // mango_client.mango_account().await.unwrap().
@@ -152,6 +161,28 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
     main_perp2jup_poller.await.unwrap();
 
 }
+
+async fn trade_sequence(mango_client: Arc<MangoClient>) {
+    // must be unique
+    let client_order_id = Utc::now().timestamp_micros() as u64;
+    debug!("starting trade sequence (client_order_id {}) ...", client_order_id);
+
+    // TODO wrap in type; pass in client_order_id
+    let mut web_socket = init_ws_subscription(&mango::MARKET_ETH_PERP);
+
+    debug!("buying asset ...");
+    buy_asset(mango_client.clone(), client_order_id).await;
+
+    debug!("waiting for fill ...");
+    block_fills_until_client_id(
+        &mut web_socket, mango::MARKET_ETH_PERP, client_order_id).await.unwrap();
+
+    debug!("selling asset ...");
+    sell_asset(mango_client.clone()).await;
+
+    debug!("trade sequence complete");
+}
+
 
 // drain feeds and get latest value
 fn drain_buy_feed(feed: &mut UnboundedReceiver<BuyPrice>) -> Option<BuyPrice> {
