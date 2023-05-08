@@ -16,7 +16,7 @@ use services::orderbook_stream_sell::listen_orderbook_feed;
 
 use crate::{mango, services};
 use crate::services::asset_price_swap::{BuyPrice, SellPrice};
-use crate::services::perp_orders::{buy_asset, buy_asset_blocking_until_fill, sell_asset};
+use crate::services::perp_orders::{perp_buy_asset, buy_asset_blocking_until_fill, swap_sell_asset};
 
 const STARTUP_DELAY: Duration = Duration::from_secs(2);
 
@@ -94,10 +94,10 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
     // buy on jupiter, short on eth-perp
     let main_jup2perp_poller = tokio::spawn({
+        let mc = mango_client.clone();
         let last_bid_price = coo.last_bid_price_shared.clone();
         let last_ask_price = coo.last_ask_price_shared.clone();
         async move {
-
             let mut interval = interval(Duration::from_secs(2));
             info!("Entering coordinator JUPITER->ETH-PERP loop (interval={:?}) ...", interval.period());
             loop {
@@ -111,6 +111,10 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                 if let (Some(perp_bid), Some(swap_buy)) = (*orderbook_bid, latest_swap_buy) {
                     let profit = (perp_bid - swap_buy.price) / swap_buy.price;
                     info!("perp-bid {:.2?} vs swap-buy {:.2?}, profit {:.2?}%", perp_bid, swap_buy.price, 100.0 * profit);
+                    if should_trade(profit) {
+                        info!("profitable trade detected, starting trade sequence ...");
+                        trade_sequence_jup2perp(mc.clone()).await;
+                    }
                 }
 
                 interval.tick().await;
@@ -120,10 +124,10 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
     // buy on eth-perp, sell on jupiter
     let main_perp2jup_poller = tokio::spawn({
+        let mc = mango_client.clone();
         let last_bid_price = coo.last_bid_price_shared.clone();
         let last_ask_price = coo.last_ask_price_shared.clone();
         async move {
-
             let mut interval = interval(Duration::from_secs(2));
             info!("Entering coordinator ETH-PERP->JUPITER loop (interval={:?}) ...", interval.period());
             loop {
@@ -140,7 +144,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
                     if should_trade(profit) {
                         info!("profitable trade detected, starting trade sequence ...");
-                        trade_sequence(mango_client.clone()).await;
+                        trade_sequence_perp2jup(mc.clone()).await;
                     }
                 }
 
@@ -164,7 +168,22 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
 }
 
-async fn trade_sequence(mango_client: Arc<MangoClient>) {
+// WIP
+async fn trade_sequence_jup2perp(mango_client: Arc<MangoClient>) {
+    // must be unique
+    let client_order_id = Utc::now().timestamp_micros() as u64;
+    debug!("starting trade sequence (client_order_id {}) ...", client_order_id);
+
+    debug!("buying asset ...");
+    // xbuy_asset_blocking_until_fill(&mango_client, client_order_id).await;
+
+    debug!("selling asset ...");
+    // sell_asset(mango_client.clone()).await;
+
+    debug!("trade sequence complete");
+}
+
+async fn trade_sequence_perp2jup(mango_client: Arc<MangoClient>) {
     // must be unique
     let client_order_id = Utc::now().timestamp_micros() as u64;
     debug!("starting trade sequence (client_order_id {}) ...", client_order_id);
@@ -173,7 +192,7 @@ async fn trade_sequence(mango_client: Arc<MangoClient>) {
     buy_asset_blocking_until_fill(&mango_client, client_order_id).await;
 
     debug!("selling asset ...");
-    sell_asset(mango_client.clone()).await;
+    swap_sell_asset(mango_client.clone()).await;
 
     debug!("trade sequence complete");
 }

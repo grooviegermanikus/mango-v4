@@ -30,9 +30,13 @@ pub fn native_amount_to_lot(lot_conf: ConversionConf, amount: f64) -> i64 {
 }
 
 pub fn native_amount(lot_conf: ConversionConf, amount: f64) -> u64 {
+    native_amount2(lot_conf.base_decimals, amount)
+}
+
+pub fn native_amount2(base_decimals: u32, amount: f64) -> u64 {
     let order_size = I80F48::from_num(amount);
 
-    let exact = order_size * I80F48::from_num(10u64.pow(lot_conf.base_decimals));
+    let exact = order_size * I80F48::from_num(10u64.pow(base_decimals));
 
     exact.to_num::<f64>().round() as u64
 }

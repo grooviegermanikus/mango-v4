@@ -4,7 +4,7 @@ use solana_sdk::pubkey::Pubkey;
 use mango_v4::state::{PerpMarket, PlaceOrderType, Side};
 use mango_v4_client::{JupiterSwapMode, MangoClient};
 use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
-use crate::numerics::{ConversionConf, native_amount, native_amount_to_lot, quote_amount_to_lot};
+use crate::numerics::{ConversionConf, native_amount, native_amount2, native_amount_to_lot, quote_amount_to_lot};
 use std::future::Future;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -88,13 +88,13 @@ pub async fn block_fills_until_client_id(
 pub async fn buy_asset_blocking_until_fill(mango_client: &Arc<MangoClient>, client_order_id: u64) {
     let mut web_socket = init_ws_subscription(&mango::MARKET_ETH_PERP);
 
-    buy_asset(mango_client.clone(), client_order_id).await;
+    perp_buy_asset(mango_client.clone(), client_order_id).await;
 
     block_fills_until_client_id(
         &mut web_socket, mango::MARKET_ETH_PERP, client_order_id).await.unwrap();
 }
 
-pub async fn buy_asset(mango_client: Arc<MangoClient>, client_order_id: u64) {
+pub async fn perp_buy_asset(mango_client: Arc<MangoClient>, client_order_id: u64) {
 
     let market_index = mango_client.context.perp_market_indexes_by_name.get("ETH-PERP").unwrap();
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
@@ -118,12 +118,37 @@ pub async fn buy_asset(mango_client: Arc<MangoClient>, client_order_id: u64) {
     debug!("sig buy: {:?}", sig);
 }
 
-// fails ATM due to delegate account
-pub async fn sell_asset(mango_client: Arc<MangoClient>) {
+// PERP ask
+pub async fn perp_ask_asset(mango_client: Arc<MangoClient>, client_order_id: u64) {
+
     let market_index = mango_client.context.perp_market_indexes_by_name.get("ETH-PERP").unwrap();
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
 
-    let order_size_sell = native_amount(perp_market.into(), 0.0001);
+    let amount = 0.0001;
+    let order_size_lots = native_amount_to_lot(perp_market.into(), amount);
+    debug!("order size ({}) sell (client id {}): {}", amount, client_order_id, order_size_lots);
+
+    let sig = mango_client.perp_place_order(
+        market_index.clone(),
+        Side::Ask, 0 /* ignore price */,
+        order_size_lots,
+        quote_amount_to_lot(perp_market.into(), 100.00),
+        client_order_id as u64,
+        PlaceOrderType::Market,
+        false,
+        0,
+        64 // max num orders to be skipped based on expiry information in the orderbook
+    ).await;
+
+    debug!("sig buy: {:?}", sig);
+}
+
+pub async fn swap_sell_asset(mango_client: Arc<MangoClient>) {
+    let mi = mango_client.context.token_indexes_by_name.get("ETH (Portal)").unwrap();
+    let mark = mango_client.context.tokens.get(mi).unwrap();
+
+    let order_size_sell = native_amount2(mark.decimals as u32, 0.0001);
+
     debug!("order size sell: {:?}", order_size_sell);
     let sig_sell = mango_client.jupiter_swap(
         Pubkey::from_str(MINT_ADDRESS_ETH).unwrap(),
@@ -135,3 +160,23 @@ pub async fn sell_asset(mango_client: Arc<MangoClient>) {
 
     debug!("sig sell: {:?}", sig_sell);
 }
+
+pub async fn swap_buy_asset(mango_client: Arc<MangoClient>) {
+    // println!("markets: {:?}", mango_client.context.token_indexes_by_name.keys());
+    let mi = mango_client.context.token_indexes_by_name.get("ETH (Portal)").unwrap();
+    let mark = mango_client.context.tokens.get(mi).unwrap();
+
+    let order_size_buy = native_amount2(mark.decimals as u32, 0.0001);
+
+    debug!("order size buy: {:?}", order_size_buy);
+    let sig_sell = mango_client.jupiter_swap(
+        Pubkey::from_str(MINT_ADDRESS_USDC).unwrap(),
+        Pubkey::from_str(MINT_ADDRESS_ETH).unwrap(),
+        order_size_buy,
+        10, // TODO 0.1%, 100=1% make configurable
+        JupiterSwapMode::ExactOut
+    ).await;
+
+    debug!("sig buy: {:?}", sig_sell);
+}
+
