@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 
 use log::{debug, info, trace};
@@ -7,12 +8,14 @@ use mpsc::unbounded_channel;
 use tokio::sync::{Barrier, mpsc, Mutex, RwLock};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::time::{interval, sleep};
+use mango_v4_client::MangoClient;
 
 use services::orderbook_stream_sell::listen_orderbook_feed;
 
 use crate::{mango, services};
 use crate::services::asset_price_swap::{BuyPrice, SellPrice};
 use crate::services::orderbook_stream_sell::listen_fills;
+use crate::services::perp_orders::buy_asset;
 
 const STARTUP_DELAY: Duration = Duration::from_secs(2);
 
@@ -25,7 +28,7 @@ struct Coordinator {
     last_ask_price_shared: Arc<RwLock<Option<f64>>>,
 }
 
-pub async fn run_coordinator_service() {
+pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
     let (buy_price_xwrite, mut buy_price_xread) = unbounded_channel();
     let (sell_price_xwrite, mut sell_price_xread) = unbounded_channel();
@@ -135,7 +138,16 @@ pub async fn run_coordinator_service() {
         }
     });
 
+    // make sure the fillter thread is up
+    thread::sleep(Duration::from_secs(3));
 
+    buy_asset(mango_client.clone()).await;
+    // sell_asset(mango_client.clone()).await;
+
+    // mango_client.mango_account().await.unwrap().
+
+
+    // block forever
     main_jup2perp_poller.await.unwrap();
     main_perp2jup_poller.await.unwrap();
 
