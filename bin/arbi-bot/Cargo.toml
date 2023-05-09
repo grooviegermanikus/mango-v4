@@ -23,7 +23,12 @@ mango-v4-client = { path = "../../lib/client" }
 pyth-sdk-solana = "0.1.0"
 serum_dex = { git = "https://github.com/openbook-dex/program.git", default-features=false,features = ["no-entrypoint", "program"] }
 solana-client = "~1.14.9"
+solana-rpc = "~1.14.9"
 solana-sdk = "~1.14.9"
+jsonrpc-core = "18.0.0"
+jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
+
+
 tokio = { version = "1.14.1", features = ["rt-multi-thread", "time", "macros", "sync"] }
 serde = { version = "1.0.122", features = ["derive"] }
 serde_json = "1.0"

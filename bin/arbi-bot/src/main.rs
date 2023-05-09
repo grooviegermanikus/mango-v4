@@ -3,13 +3,11 @@ mod services;
 mod coordinator;
 mod numerics;
 
+use solana_rpc::rpc_pubsub::{RpcSolPubSub, RpcSolPubSubClient};
 use std::future::Future;
 use std::rc::Rc;
 use clap::{Args, Parser, Subcommand};
-use mango_v4_client::{
-    keypair_from_cli, pubkey_from_cli, Client, JupiterSwapMode, MangoClient,
-    TransactionBuilderConfig,
-};
+use mango_v4_client::{keypair_from_cli, pubkey_from_cli, Client, JupiterSwapMode, MangoClient, TransactionBuilderConfig, AnyhowWrap};
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -19,6 +17,10 @@ use std::time::{Duration, Instant};
 use chrono::Utc;
 use futures::future::join_all;
 use futures::TryFutureExt;
+use jsonrpc_core_client::transports::ws;
+use jsonrpc_core_client::TypedSubscriptionStream;
+use solana_client::rpc_config::RpcSignatureSubscribeConfig;
+use solana_client::rpc_response::{Response, RpcSignatureResult};
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::Keypair;
 use solana_sdk::signer::keypair;
@@ -32,6 +34,8 @@ use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 use crate::numerics::{native_amount, native_amount_to_lot, quote_amount_to_lot};
 use crate::services::blockhash::start_blockhash_service;
 use crate::services::perp_orders::{perp_bid_asset, perp_ask_asset};
+use crate::services::swap_orders::swap_buy_asset;
+use crate::services::transactions;
 
 #[derive(Parser, Debug, Clone)]
 #[clap()]
@@ -69,7 +73,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // use private key (solana-keygen)
     let owner: Arc<Keypair> = Arc::new(keypair_from_cli(cli.owner.as_str()));
 
-    let cluster = Cluster::Custom(rpc_url.clone(), ws_url);
+    let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
 
     let mango_client = Arc::new(
         MangoClient::new_for_existing_account(
@@ -87,28 +91,41 @@ async fn main() -> Result<(), anyhow::Error> {
             owner.clone(),
         ).await?);
 
-    // let x = mango_client.get_oracle_price("ETH (Portal)");
-    // println!("oracle price: {:?}", x.await?);
 
+    // let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
+    // coordinator_thread.await?;
 
-    // let recent_confirmed_blockhash = start_blockhash_service(rpc_url.clone()).await;
-    // println!("blockhash: {}", recent_confirmed_blockhash.read().unwrap());
+    // play with confirmation
+    // let async_buy = swap_buy_asset(mango_client.clone());
 
+    // transactions::await_transaction_signature_confirmation(mango_client.clone()).await;
 
-    let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
-    coordinator_thread.await?;
+    let connect = ws::try_connect::<RpcSolPubSubClient>(&ws_url).map_err_anyhow()?;
+    let client = connect.await.map_err_anyhow()?;
 
-    // let client_order_id = Utc::now().timestamp_micros() as u64;
-    // perp_ask_asset(mango_client.clone(), client_order_id).await;
-    // swap_sell_asset(mango_client.clone()).await;
-    // swap_buy_asset(mango_client.clone()).await;
+    let foo = client.signature_subscribe(
+        "3EtVaf1Go41W1dTkG8PtfrRDrrcBsiXzzWCmtmRr4Ce7YRDuPRJ4mXYhqK7zYsCrVAaCJqsPChCd8yUnPPki4WW1".to_string(),
+        Some(RpcSignatureSubscribeConfig { commitment: Some(CommitmentConfig::confirmed()), enable_received_notification: None })
+        // meta: Self::Metadata,
+        // subscriber: Subscriber<RpcResponse<RpcSignatureResult>>,
+        // signature_str: String,
+        // config: Option<RpcSignatureSubscribeConfig>,
+    );
 
-    // buy_asset(mango_client.clone()).await;
-    // sell_asset(mango_client.clone()).await;
+    // Result<TypedSubscriptionStream<Response<RpcSignatureResult>>, RpcError>
 
-    // mango_client.mango_account().await.unwrap().
+    let sub : TypedSubscriptionStream<Response<RpcSignatureResult>> = foo.unwrap();
+
+    sub.next();
+
+    // async_buy.await;
 
 
     Ok(())
+}
+
+fn _blockhash_poller() {
+    // let recent_confirmed_blockhash = start_blockhash_service(rpc_url.clone()).await;
+    // println!("blockhash: {}", recent_confirmed_blockhash.read().unwrap());
 }
 
