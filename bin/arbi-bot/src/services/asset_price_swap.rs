@@ -8,14 +8,14 @@ use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 use crate::services::orderbook_stream_sell::OrderstreamPrice;
 
 #[derive(Debug, Copy, Clone)]
-pub struct BuyPrice {
+pub struct SwapBuyPrice {
     // ETH in USD - e.g 1900
     pub price: f64,
     pub approx_timestamp: Instant,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct SellPrice {
+pub struct SwapSellPrice {
     // ETH in USD - e.g 1900
     pub price: f64,
     pub approx_timestamp: Instant,
@@ -106,11 +106,11 @@ async fn call_exactin() -> anyhow::Result<Vec<SwapQueryResult>> {
     Ok(quote)
 }
 
-pub async fn call_buy() -> BuyPrice {
+pub async fn call_buy() -> SwapBuyPrice {
 
     match call_exactin().await {
         Ok(res) =>
-            BuyPrice {
+            SwapBuyPrice {
                 price: calc_price_exactin(res),
                 approx_timestamp: Instant::now(),
             },
@@ -149,11 +149,11 @@ async fn call_exactout() -> anyhow::Result<Vec<SwapQueryResult>> {
     Ok(quote)
 }
 
-pub async fn call_sell() -> SellPrice {
+pub async fn call_sell() -> SwapSellPrice {
 
     match call_exactout().await {
         Ok(res) =>
-            SellPrice {
+            SwapSellPrice {
                 price: calc_price_exactout(res),
                 approx_timestamp: Instant::now(),
             },

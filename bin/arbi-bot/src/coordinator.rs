@@ -5,25 +5,28 @@ use std::thread;
 use std::time::Duration;
 use chrono::Utc;
 
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use mpsc::unbounded_channel;
 use tokio::sync::{Barrier, mpsc, Mutex, RwLock};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::time::{interval, sleep};
 use mango_v4_client::MangoClient;
 
-use services::orderbook_stream_sell::listen_orderbook_feed;
+use services::orderbook_stream_sell::listen_perp_market_feed;
 
 use crate::{mango, services};
-use crate::services::asset_price_swap::{BuyPrice, SellPrice};
-use crate::services::perp_orders::{perp_buy_asset, buy_asset_blocking_until_fill, swap_sell_asset, swap_buy_asset, sell_asset_blocking_until_fill};
+use crate::services::asset_price_swap::{SwapBuyPrice, SwapSellPrice};
+use crate::services::perp_orders::{perp_ask_asset, perp_bid_asset, perp_bid_blocking_until_fill};
+use crate::services::swap_orders::{swap_buy_asset, swap_sell_asset};
+
+const DRY_RUN: bool = true;
 
 const STARTUP_DELAY: Duration = Duration::from_secs(2);
 
 struct Coordinator {
     // swap price from router service
-    buy_price_stream: UnboundedReceiver<BuyPrice>,
-    sell_price_stream: UnboundedReceiver<SellPrice>,
+    buy_price_stream: UnboundedReceiver<SwapBuyPrice>,
+    sell_price_stream: UnboundedReceiver<SwapSellPrice>,
     // orderbook
     last_bid_price_shared: Arc<RwLock<Option<f64>>>,
     last_ask_price_shared: Arc<RwLock<Option<f64>>>,
@@ -76,33 +79,20 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
         let last_ask_price = coo.last_ask_price_shared.clone();
         async move {
             sleep(STARTUP_DELAY).await;
-            listen_orderbook_feed(mango::MARKET_ETH_PERP, last_bid_price, last_ask_price).await;
+            listen_perp_market_feed(mango::MARKET_ETH_PERP, last_bid_price, last_ask_price).await;
         }
     });
 
-    // // assume that client_order_id is in map
-    // let signal_order_fill : Arc<RwLock<HashMap<u64, Condvar>>> =
-    //     Arc::new(RwLock::new(HashMap::new()));
-
-    // let poll_fills = tokio::spawn({
-    //     let signal_order_fill_m = signal_order_fill.clone();
-    //     async move {
-    //         sleep(STARTUP_DELAY).await;
-    //         listen_fills_until_client_id(mango::MARKET_ETH_PERP, signal_order_fill_m.clone()).await;
-    //     }
-    // });
-
     // buy on jupiter, short on eth-perp
-    let main_jup2perp_poller = tokio::spawn({
+    let main_swap2perp_poller = tokio::spawn({
         let mc = mango_client.clone();
         let last_bid_price = coo.last_bid_price_shared.clone();
-        let last_ask_price = coo.last_ask_price_shared.clone();
         async move {
             let mut interval = interval(Duration::from_secs(2));
             info!("Entering coordinator JUPITER->ETH-PERP loop (interval={:?}) ...", interval.period());
             loop {
 
-                let latest_swap_buy = drain_buy_feed(&mut coo.buy_price_stream);
+                let latest_swap_buy = drain_swap_buy_feed(&mut coo.buy_price_stream);
                 debug!("swap latest buy price {:?}", latest_swap_buy);
 
                 let orderbook_bid = last_bid_price.read().await;
@@ -112,8 +102,8 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                     let profit = (perp_bid - swap_buy.price) / swap_buy.price;
                     info!("perp-bid {:.2?} vs swap-buy {:.2?}, profit {:.2?}%", perp_bid, swap_buy.price, 100.0 * profit);
                     if should_trade(profit) {
-                        info!("profitable trade detected, starting trade sequence ...");
-                        trade_sequence_jup2perp(mc.clone()).await;
+                        info!("profitable trade swap2perp detected, starting trade sequence ...");
+                        trade_sequence_swap2perp(mc.clone()).await;
                     }
                 }
 
@@ -123,28 +113,26 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
     });
 
     // buy on eth-perp, sell on jupiter
-    let main_perp2jup_poller = tokio::spawn({
+    let main_perp2swap_poller = tokio::spawn({
         let mc = mango_client.clone();
-        let last_bid_price = coo.last_bid_price_shared.clone();
         let last_ask_price = coo.last_ask_price_shared.clone();
         async move {
             let mut interval = interval(Duration::from_secs(2));
             info!("Entering coordinator ETH-PERP->JUPITER loop (interval={:?}) ...", interval.period());
             loop {
-
-                let latest_swap_sell = drain_sell_feed(&mut coo.sell_price_stream);
-                debug!("swap latest sell price {:?}", latest_swap_sell);
-
                 let orderbook_ask = last_ask_price.read().await;
                 debug!("orderbook(perp) best ask {:?}", *orderbook_ask);
+
+                let latest_swap_sell = drain_swap_sell_feed(&mut coo.sell_price_stream);
+                debug!("swap latest sell price {:?}", latest_swap_sell);
 
                 if let (Some(perp_ask), Some(swap_sell)) = (*orderbook_ask, latest_swap_sell) {
                     let profit = (swap_sell.price - perp_ask) / perp_ask;
                     info!("swap-sell {:.2?} vs perp-ask {:.2?}, profit {:.2?}%", swap_sell.price, perp_ask, 100.0 * profit);
 
                     if should_trade(profit) {
-                        info!("profitable trade detected, starting trade sequence ...");
-                        trade_sequence_perp2jup(mc.clone()).await;
+                        info!("profitable trade perp2swap detected, starting trade sequence ...");
+                        trade_sequence_perp2swap(mc.clone()).await;
                     }
                 }
 
@@ -154,7 +142,6 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
     });
 
     // make sure the fillter thread is up
-    thread::sleep(Duration::from_secs(3));
 
     // buy_asset(mango_client.clone()).await;
     // sell_asset(mango_client.clone()).await;
@@ -163,54 +150,67 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
 
     // block forever
-    main_jup2perp_poller.await.unwrap();
-    main_perp2jup_poller.await.unwrap();
+    main_swap2perp_poller.await.unwrap();
+    main_perp2swap_poller.await.unwrap();
 
 }
 
-async fn trade_sequence_jup2perp(mango_client: Arc<MangoClient>) {
+async fn trade_sequence_swap2perp(mango_client: Arc<MangoClient>) {
+    if DRY_RUN {
+        warn!("skip trading (dry-run mode)");
+        return;
+    }
+    // TODO throttle
+
     // must be unique
     let client_order_id = Utc::now().timestamp_micros() as u64;
-    debug!("starting trade sequence (client_order_id {}) ...", client_order_id);
+    debug!("starting swap->perp trade sequence (client_order_id {}) ...", client_order_id);
 
+    // TODO buy + sell in parallel
     debug!("buying asset ...");
     swap_buy_asset(mango_client.clone()).await;
+    // TODO check for confirmed state (ask max)
 
     debug!("selling asset ...");
-    sell_asset_blocking_until_fill(&mango_client, client_order_id).await;
+    perp_ask_asset(mango_client.clone(), client_order_id).await;
+    // sell_asset_blocking_until_fill(&mango_client, client_order_id).await;
 
-    debug!("trade sequence complete");
+    debug!("trade sequence completed.");
 }
 
-async fn trade_sequence_perp2jup(mango_client: Arc<MangoClient>) {
+async fn trade_sequence_perp2swap(mango_client: Arc<MangoClient>) {
+    if DRY_RUN {
+        warn!("skip trading (dry-run mode)");
+        return;
+    }
     // must be unique
     let client_order_id = Utc::now().timestamp_micros() as u64;
-    debug!("starting trade sequence (client_order_id {}) ...", client_order_id);
+    debug!("starting perp->swap trade sequence (client_order_id {}) ...", client_order_id);
 
     debug!("buying asset ...");
-    buy_asset_blocking_until_fill(&mango_client, client_order_id).await;
+    perp_bid_blocking_until_fill(&mango_client, client_order_id).await;
 
     debug!("selling asset ...");
     swap_sell_asset(mango_client.clone()).await;
 
-    debug!("trade sequence complete");
+    debug!("trade sequence completed.");
 }
 
 
 // drain feeds and get latest value
-fn drain_buy_feed(feed: &mut UnboundedReceiver<BuyPrice>) -> Option<BuyPrice> {
+fn drain_swap_buy_feed(feed: &mut UnboundedReceiver<SwapBuyPrice>) -> Option<SwapBuyPrice> {
     let mut latest = None;
     while let Ok(price) = feed.try_recv() {
-        trace!("drain buy price from feed {:?}", price);
+        trace!("drain swap buy price from feed {:?}", price);
         latest = Some(price);
     }
     latest
 }
 
-fn drain_sell_feed(feed: &mut UnboundedReceiver<SellPrice>) -> Option<SellPrice> {
+fn drain_swap_sell_feed(feed: &mut UnboundedReceiver<SwapSellPrice>) -> Option<SwapSellPrice> {
     let mut latest = None;
     while let Ok(price) = feed.try_recv() {
-        trace!("drain sell price from feed {:?}", price);
+        trace!("drain swap sell price from feed {:?}", price);
         latest = Some(price);
     }
     latest

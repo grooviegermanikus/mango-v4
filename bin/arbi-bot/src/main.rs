@@ -4,6 +4,7 @@ mod coordinator;
 mod numerics;
 
 use std::future::Future;
+use std::rc::Rc;
 use clap::{Args, Parser, Subcommand};
 use mango_v4_client::{
     keypair_from_cli, pubkey_from_cli, Client, JupiterSwapMode, MangoClient,
@@ -13,6 +14,7 @@ use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
+use std::thread::sleep;
 use std::time::{Duration, Instant};
 use chrono::Utc;
 use futures::TryFutureExt;
@@ -27,7 +29,8 @@ use fixed::types::I80F48;
 use mango_v4::state::{PerpMarket, PerpMarketIndex, PlaceOrderType, QUOTE_DECIMALS, Side};
 use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 use crate::numerics::{native_amount, native_amount_to_lot, quote_amount_to_lot};
-use crate::services::perp_orders::{perp_buy_asset, perp_ask_asset, swap_buy_asset, swap_sell_asset};
+use crate::services::blockhash::start_blockhash_service;
+use crate::services::perp_orders::{perp_bid_asset, perp_ask_asset};
 
 #[derive(Parser, Debug, Clone)]
 #[clap()]
@@ -65,7 +68,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // use private key (solana-keygen)
     let owner: Arc<Keypair> = Arc::new(keypair_from_cli(cli.owner.as_str()));
 
-    let cluster = Cluster::Custom(rpc_url, ws_url);
+    let cluster = Cluster::Custom(rpc_url.clone(), ws_url);
 
     let mango_client = Arc::new(
         MangoClient::new_for_existing_account(
@@ -87,7 +90,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // println!("oracle price: {:?}", x.await?);
 
 
-    // TODO make it smarter
+    // let recent_confirmed_blockhash = start_blockhash_service(rpc_url.clone()).await;
+    // println!("blockhash: {}", recent_confirmed_blockhash.read().unwrap());
+
+
     let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
 
     // let client_order_id = Utc::now().timestamp_micros() as u64;

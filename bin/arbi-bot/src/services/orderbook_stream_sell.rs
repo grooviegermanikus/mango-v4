@@ -66,12 +66,12 @@ struct Subscriptions {
 }
 
 #[derive(Default)]
-struct Orderbook {
+struct PerpOrderbook {
     pub bids: BTreeMap<OrderedFloat<f64>, f64>,
     pub asks: BTreeMap<OrderedFloat<f64>, f64>,
 }
 
-impl Orderbook {
+impl PerpOrderbook {
 
     fn update_bid_price(&mut self, price: f64, quantity: f64) {
         assert!(quantity.is_sign_positive(), "bid quantity must be non-negative but was <{}>", price);
@@ -117,9 +117,9 @@ impl Orderbook {
 }
 
 // requires running "service-mango-orderbook" - see README
-pub async fn listen_orderbook_feed(market_id: &str,
-                                   highest_bid_price: Arc<RwLock<Option<f64>>>,
-                                   lowest_ask_price: Arc<RwLock<Option<f64>>>) {
+pub async fn listen_perp_market_feed(market_id: &str,
+                                     highest_bid_price: Arc<RwLock<Option<f64>>>,
+                                     lowest_ask_price: Arc<RwLock<Option<f64>>>) {
 
     let (mut socket, response) =
         connect(Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap()).expect("Can't connect");
@@ -140,7 +140,7 @@ pub async fn listen_orderbook_feed(market_id: &str,
 
     socket.write_message(Message::text(json!(sub).to_string())).unwrap();
 
-    let mut orderbook: Orderbook = Orderbook::default();
+    let mut orderbook: PerpOrderbook = PerpOrderbook::default();
 
     loop {
         match socket.read_message() {
