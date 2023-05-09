@@ -16,7 +16,7 @@ use services::orderbook_stream_sell::listen_orderbook_feed;
 
 use crate::{mango, services};
 use crate::services::asset_price_swap::{BuyPrice, SellPrice};
-use crate::services::perp_orders::{perp_buy_asset, buy_asset_blocking_until_fill, swap_sell_asset};
+use crate::services::perp_orders::{perp_buy_asset, buy_asset_blocking_until_fill, swap_sell_asset, swap_buy_asset, sell_asset_blocking_until_fill};
 
 const STARTUP_DELAY: Duration = Duration::from_secs(2);
 
@@ -168,17 +168,16 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
 }
 
-// WIP
 async fn trade_sequence_jup2perp(mango_client: Arc<MangoClient>) {
     // must be unique
     let client_order_id = Utc::now().timestamp_micros() as u64;
     debug!("starting trade sequence (client_order_id {}) ...", client_order_id);
 
     debug!("buying asset ...");
-    // xbuy_asset_blocking_until_fill(&mango_client, client_order_id).await;
+    swap_buy_asset(mango_client.clone()).await;
 
     debug!("selling asset ...");
-    // sell_asset(mango_client.clone()).await;
+    sell_asset_blocking_until_fill(&mango_client, client_order_id).await;
 
     debug!("trade sequence complete");
 }
@@ -218,5 +217,5 @@ fn drain_sell_feed(feed: &mut UnboundedReceiver<SellPrice>) -> Option<SellPrice>
 }
 
 fn should_trade(profit: f64) -> bool {
-    profit > 0.01
+    profit > 0.004 // 0.4%
 }

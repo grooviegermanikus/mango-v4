@@ -88,11 +88,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
 
     // TODO make it smarter
-    // let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
+    let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
 
-    let client_order_id = Utc::now().timestamp_micros() as u64;
+    // let client_order_id = Utc::now().timestamp_micros() as u64;
     // perp_ask_asset(mango_client.clone(), client_order_id).await;
-    swap_sell_asset(mango_client.clone()).await;
+    // swap_sell_asset(mango_client.clone()).await;
     // swap_buy_asset(mango_client.clone()).await;
 
     // buy_asset(mango_client.clone()).await;
@@ -100,7 +100,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // mango_client.mango_account().await.unwrap().
 
-    // coordinator_thread.await?;
+    coordinator_thread.await?;
 
     Ok(())
 }

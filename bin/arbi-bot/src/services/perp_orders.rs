@@ -118,6 +118,15 @@ pub async fn perp_buy_asset(mango_client: Arc<MangoClient>, client_order_id: u64
     debug!("sig buy: {:?}", sig);
 }
 
+pub async fn sell_asset_blocking_until_fill(mango_client: &Arc<MangoClient>, client_order_id: u64) {
+    let mut web_socket = init_ws_subscription(&mango::MARKET_ETH_PERP);
+
+    perp_ask_asset(mango_client.clone(), client_order_id).await;
+
+    block_fills_until_client_id(
+        &mut web_socket, mango::MARKET_ETH_PERP, client_order_id).await.unwrap();
+}
+
 // PERP ask
 pub async fn perp_ask_asset(mango_client: Arc<MangoClient>, client_order_id: u64) {
 
