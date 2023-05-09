@@ -14,6 +14,7 @@ use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Value};
 use std::net::TcpStream;
+use solana_sdk::signature::Signature;
 use tokio_tungstenite::tungstenite::{connect, Message, WebSocket};
 use tokio_tungstenite::tungstenite::client::connect_with_config;
 use tokio_tungstenite::tungstenite::stream::MaybeTlsStream;
@@ -95,7 +96,7 @@ pub async fn perp_bid_blocking_until_fill(mango_client: &Arc<MangoClient>, clien
         &mut web_socket, mango::MARKET_ETH_PERP, client_order_id).await.unwrap();
 }
 
-pub async fn perp_bid_asset(mango_client: Arc<MangoClient>, client_order_id: u64) {
+pub async fn perp_bid_asset(mango_client: Arc<MangoClient>, client_order_id: u64) -> Signature {
 
     let market_index = mango_client.context.perp_market_indexes_by_name.get("ETH-PERP").unwrap();
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
@@ -117,11 +118,14 @@ pub async fn perp_bid_asset(mango_client: Arc<MangoClient>, client_order_id: u64
     ).await;
 
     debug!("tx-sig perp-bid: {:?}", sig);
+
+    sig.unwrap()
 }
 
 // PERP ask
 // only return sig, caller must check for progress/confirmation
-pub async fn perp_ask_asset(mango_client: Arc<MangoClient>, client_order_id: u64) {
+pub async fn perp_ask_asset(mango_client: Arc<MangoClient>) -> Signature {
+    let client_order_id = Utc::now().timestamp_micros() as u64;
 
     let market_index = mango_client.context.perp_market_indexes_by_name.get("ETH-PERP").unwrap();
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
@@ -144,4 +148,6 @@ pub async fn perp_ask_asset(mango_client: Arc<MangoClient>, client_order_id: u64
     ).await;
 
     debug!("tx-sig perp-ask: {:?}", sig);
+
+    sig.unwrap()
 }

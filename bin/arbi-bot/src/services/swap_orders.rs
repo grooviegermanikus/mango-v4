@@ -10,9 +10,10 @@ use std::str::FromStr;
 use anyhow::anyhow;
 use log::debug;
 use serde::{Deserialize, Serialize};
+use solana_sdk::signature::Signature;
 
 
-pub async fn swap_sell_asset(mango_client: Arc<MangoClient>) {
+pub async fn swap_sell_asset(mango_client: Arc<MangoClient>) -> Signature {
     let market_index = mango_client.context.token_indexes_by_name.get("ETH (Portal)").unwrap();
     let market = mango_client.context.tokens.get(market_index).unwrap();
 
@@ -28,10 +29,12 @@ pub async fn swap_sell_asset(mango_client: Arc<MangoClient>) {
     ).await;
 
     debug!("tx-sig swap sell: {:?}", sig_sell);
+
+    sig_sell.unwrap()
 }
 
 // only return sig, caller must check for progress/confirmation
-pub async fn swap_buy_asset(mango_client: Arc<MangoClient>) {
+pub async fn swap_buy_asset(mango_client: Arc<MangoClient>) -> Signature {
     let market_index = mango_client.context.token_indexes_by_name.get("ETH (Portal)").unwrap();
     let market = mango_client.context.tokens.get(market_index).unwrap();
 
@@ -48,5 +51,7 @@ pub async fn swap_buy_asset(mango_client: Arc<MangoClient>) {
 
     debug!("tx-sig swap buy: {:?}", sig_buy);
     // TODO return sig
+
+    sig_buy.unwrap()
 }
 

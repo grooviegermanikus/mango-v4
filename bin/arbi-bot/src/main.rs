@@ -17,6 +17,7 @@ use std::thread;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use chrono::Utc;
+use futures::future::join_all;
 use futures::TryFutureExt;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::Keypair;
@@ -95,6 +96,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
 
     let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
+    coordinator_thread.await?;
 
     // let client_order_id = Utc::now().timestamp_micros() as u64;
     // perp_ask_asset(mango_client.clone(), client_order_id).await;
@@ -106,7 +108,6 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // mango_client.mango_account().await.unwrap().
 
-    coordinator_thread.await?;
 
     Ok(())
 }
