@@ -39,7 +39,9 @@ use crate::services::transactions;
 
 use solana_client::rpc_response::SlotUpdate;
 use jsonrpc_core::futures::StreamExt;
+use log::info;
 use solana_client::nonblocking::pubsub_client::PubsubClient;
+use solana_client::nonblocking::rpc_client::RpcClient;
 // use jsonrpc_core_client::transports::ws;
 // use jsonrpc_core_client::TypedSubscriptionStream;
 
@@ -88,7 +90,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 // TODO need two (ask Max)
                 CommitmentConfig::processed(),
                 owner.clone(),
-                Some(Duration::from_secs(5)),
+                Some(Duration::from_secs(12)),
                 TransactionBuilderConfig {
                     prioritization_micro_lamports: Some(1),
                 },
@@ -106,27 +108,16 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // transactions::await_transaction_signature_confirmation(mango_client.clone()).await;
 
-    println!("Connected to {}", ws_url);
-    let client = PubsubClient::new(&ws_url).await?;
-
-    let async_buy = swap_buy_asset(mango_client.clone());
-
-    let sig = async_buy.await;
-    let (mut stream, _unsusbscribe) = client.signature_subscribe(
-        &sig, Some(RpcSignatureSubscribeConfig { commitment: Some(CommitmentConfig::confirmed()), enable_received_notification: None })).await?;
+    // let rpc_client = RpcClient::new(rpc_url.clone());
+    // play_with_sigaturesubscription(&ws_url, mango_client, rpc_client).await;
 
 
-    while let Some(msg) = stream.next().await {
-        match msg.value {
-            RpcSignatureResult::ProcessedSignature(s) => {
-                log::info!("processed err={:?}", s);
-                // break;
-            }
-            RpcSignatureResult::ReceivedSignature(_) => {
-                log::info!("received");
-            }
-        }
-    }
+    // pub slot: Slot,
+    // pub confirmations: Option<usize>,  // None = rooted
+    // pub status: TransactionResult<()>, // legacy field
+    // pub err: Option<TransactionError>,
+    // pub confirmation_status: Option<TransactionConfirmationStatus>,
+
 
     // let connect = ws::try_connect::<RpcSolPubSubClient>(&ws_url).map_err_anyhow()?;
     // let client = connect.await.map_err_anyhow()?;
@@ -155,6 +146,45 @@ async fn main() -> Result<(), anyhow::Error> {
 
 
     Ok(())
+}
+
+async fn play_with_sigaturesubscription(ws_url: &String, mango_client: Arc<MangoClient>, rpc_client: RpcClient) {
+    println!("Connected to {}", ws_url);
+    let client = PubsubClient::new(&ws_url).await?;
+
+    let async_buy = swap_buy_asset(mango_client.clone());
+    let sig = async_buy.await;
+    let sigs = &[sig];
+
+    let subscribe_handle = tokio::spawn(async move {
+        let sig = sig.clone();
+        let (mut stream, fn_unsusbscribe) = client.signature_subscribe(
+            &sig, Some(RpcSignatureSubscribeConfig { commitment: None, enable_received_notification: Some(true) })).await.unwrap();
+
+        while let Some(msg) = stream.next().await {
+            match msg.value {
+                RpcSignatureResult::ProcessedSignature(s) => {
+                    log::info!("processed err={:?}", s);
+                    // break;
+                    break;
+                }
+                RpcSignatureResult::ReceivedSignature(_) => {
+                    log::info!("received");
+                }
+            }
+        }
+
+        fn_unsusbscribe();
+    });
+
+
+    let asdf = rpc_client.get_signature_statuses(sigs);
+
+    let sdfs = asdf.await.unwrap().value[0].clone();
+    let tx_status = sdfs.unwrap();
+    info!("tx_status={:?}", tx_status);
+
+    subscribe_handle.await;
 }
 
 fn _blockhash_poller() {
