@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
+use std::future::Future;
 use std::net::TcpStream;
+use std::pin::Pin;
 use std::sync::{Arc, Condvar};
 use std::time::Instant;
 use anyhow::anyhow;
@@ -8,10 +10,13 @@ use log::{debug, error, info, trace, warn};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Value};
+use tokio::io;
 use tokio::sync::{Mutex, RwLock};
-use tokio_tungstenite::tungstenite;
-use tokio_tungstenite::tungstenite::{connect, Message, WebSocket};
+use stream_reconnect::{UnderlyingStream, ReconnectStream};
+use tokio_tungstenite::{connect_async, tungstenite, WebSocketStream};
+use tokio_tungstenite::tungstenite::{connect, Message, WebSocket, error::Error as WsError};
 use tokio_tungstenite::tungstenite::client::connect_with_config;
+use tokio_tungstenite::tungstenite::http::Response;
 use tokio_tungstenite::tungstenite::stream::MaybeTlsStream;
 use url::Url;
 use crate::services::fill_update_event::FillUpdateEvent;
@@ -116,18 +121,29 @@ impl PerpOrderbook {
     }
 }
 
+
 // requires running "service-mango-orderbook" - see README
 pub async fn listen_perp_market_feed(market_id: &str,
                                      highest_bid_price: Arc<RwLock<Option<f64>>>,
                                      lowest_ask_price: Arc<RwLock<Option<f64>>>) {
 
-    let (mut socket, response) =
-        connect(Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap()).expect("Can't connect");
 
+    // let mut foo = connect(Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap()).expect("Can't connect");
+    // foo.0.read_message();
+    //
+    // let socket : ReconnectWs
+    // = ReconnectWs::connect("wss://api.mngo.cloud/orderbook/v1/".to_string()).await.unwrap();
+    // socket.0.0.read_message();
+
+    let (mut dsocket, response) =
+        connect(Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap()).expect("Can't connect");
+    //     ReconnectWs::connect("wss://api.mngo.cloud/orderbook/v1/".to_string());
+    //
     if response.status() != 101 {
         // TODO implement reconnects
         panic!("Error connecting to the server: {:?}", response);
     }
+
     // Response { status: 101, version: HTTP/1.1, headers: {"connection": "Upgrade", "upgrade": "websocket", "sec-websocket-accept": "ppgfXDDxtQBmL0eczLMf5VGbFIo="}, body: () }
 
     // subscriptions= {"command":"subscribe","marketId":"ESdnpnNLgTkBCZRuTJkZLi5wKEZ2z47SG3PJrhundSQ2"}
@@ -232,4 +248,48 @@ pub async fn listen_perp_market_feed(market_id: &str,
     }
 
 
+}
+
+type ReconnectWs = ReconnectStream<MyWs, String, Result<Message, WsError>, WsError>;
+
+
+// https://docs.rs/stream-reconnect/0.3.4/stream_reconnect/
+struct MyWs((WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, tungstenite::handshake::client::Response));
+
+impl UnderlyingStream<String, Result<Message, WsError>, WsError> for MyWs {
+    // Establishes connection.
+    // Additionally, this will be used when reconnect tries are attempted.
+    fn establish(addr: String) -> Pin<Box<dyn Future<Output = Result<Self, WsError>> + Send>> {
+        Box::pin(async move {
+            // In this case, we are trying to connect to the WebSocket endpoint
+            let (ws_connection, response) = connect_async(addr).await.unwrap();
+            Ok(MyWs((ws_connection, response)))
+        })
+    }
+
+    // The following errors are considered disconnect errors.
+    fn is_write_disconnect_error(&self, err: &WsError) -> bool {
+        matches!(
+                err,
+                WsError::ConnectionClosed
+                    | WsError::AlreadyClosed
+                    | WsError::Io(_)
+                    | WsError::Tls(_)
+                    | WsError::Protocol(_)
+            )
+    }
+
+    // If an `Err` is read, then there might be an disconnection.
+    fn is_read_disconnect_error(&self, item: &Result<Message, WsError>) -> bool {
+        if let Err(e) = item {
+            self.is_write_disconnect_error(e)
+        } else {
+            false
+        }
+    }
+
+    // Return "Exhausted" if all retry attempts are failed.
+    fn exhaust_err() -> WsError {
+        WsError::Io(io::Error::new(io::ErrorKind::Other, "Exhausted"))
+    }
 }

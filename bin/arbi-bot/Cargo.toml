@@ -35,6 +35,8 @@ serde_json = "1.0"
 chrono = { version = "0.4.24", features = ["serde"] }
 
 tokio-tungstenite = { version = "0.17.2", features = ["native-tls"] }
+stream-reconnect = "0.3.4"
+
 itertools = "0.10.5"
 ordered-float = "3.7.0"
 url = "2.3.1"
