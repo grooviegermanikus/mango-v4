@@ -22,7 +22,7 @@ use jsonrpc_core_client::TypedSubscriptionStream;
 use solana_client::rpc_config::RpcSignatureSubscribeConfig;
 use solana_client::rpc_response::{Response, RpcSignatureResult};
 use solana_sdk::commitment_config::CommitmentConfig;
-use solana_sdk::signature::Keypair;
+use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::signer::keypair;
 use anchor_client::Cluster;
 use solana_sdk::signature::Signer;
@@ -36,6 +36,12 @@ use crate::services::blockhash::start_blockhash_service;
 use crate::services::perp_orders::{perp_bid_asset, perp_ask_asset};
 use crate::services::swap_orders::swap_buy_asset;
 use crate::services::transactions;
+
+use solana_client::rpc_response::SlotUpdate;
+use jsonrpc_core::futures::StreamExt;
+use solana_client::nonblocking::pubsub_client::PubsubClient;
+// use jsonrpc_core_client::transports::ws;
+// use jsonrpc_core_client::TypedSubscriptionStream;
 
 #[derive(Parser, Debug, Clone)]
 #[clap()]
@@ -68,7 +74,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let cli = Cli::parse_from(std::env::args_os());
 
     let rpc_url = cli.rpc_url;
-    let ws_url = rpc_url.replace("https", "wss");
+    let ws_url = rpc_url.replace("https", "wss").replace("http", "ws");
 
     // use private key (solana-keygen)
     let owner: Arc<Keypair> = Arc::new(keypair_from_cli(cli.owner.as_str()));
@@ -100,23 +106,50 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // transactions::await_transaction_signature_confirmation(mango_client.clone()).await;
 
-    let connect = ws::try_connect::<RpcSolPubSubClient>(&ws_url).map_err_anyhow()?;
-    let client = connect.await.map_err_anyhow()?;
+    println!("Connected to {}", ws_url);
+    let client = PubsubClient::new(&ws_url).await?;
 
-    let foo = client.signature_subscribe(
-        "3EtVaf1Go41W1dTkG8PtfrRDrrcBsiXzzWCmtmRr4Ce7YRDuPRJ4mXYhqK7zYsCrVAaCJqsPChCd8yUnPPki4WW1".to_string(),
-        Some(RpcSignatureSubscribeConfig { commitment: Some(CommitmentConfig::confirmed()), enable_received_notification: None })
-        // meta: Self::Metadata,
-        // subscriber: Subscriber<RpcResponse<RpcSignatureResult>>,
-        // signature_str: String,
-        // config: Option<RpcSignatureSubscribeConfig>,
-    );
+    let async_buy = swap_buy_asset(mango_client.clone());
+
+    let sig = async_buy.await;
+    let (mut stream, _unsusbscribe) = client.signature_subscribe(
+        &sig, Some(RpcSignatureSubscribeConfig { commitment: Some(CommitmentConfig::confirmed()), enable_received_notification: None })).await?;
+
+
+    while let Some(msg) = stream.next().await {
+        match msg.value {
+            RpcSignatureResult::ProcessedSignature(s) => {
+                log::info!("processed err={:?}", s);
+                // break;
+            }
+            RpcSignatureResult::ReceivedSignature(_) => {
+                log::info!("received");
+            }
+        }
+    }
+
+    // let connect = ws::try_connect::<RpcSolPubSubClient>(&ws_url).map_err_anyhow()?;
+    // let client = connect.await.map_err_anyhow()?;
+
+    // Signature::from_str()
+
+    // let foo = client.signature_subscribe(
+    //     "3EtVaf1Go41W1dTkG8PtfrRDrrcBsiXzzWCmtmRr4Ce7YRDuPRJ4mXYhqK7zYsCrVAaCJqsPChCd8yUnPPki4WW1".to_string(),
+    //     Some(RpcSignatureSubscribeConfig { commitment: Some(CommitmentConfig::confirmed()), enable_received_notification: None })
+    //     // meta: Self::Metadata,
+    //     // subscriber: Subscriber<RpcResponse<RpcSignatureResult>>,
+    //     // signature_str: String,
+    //     // config: Option<RpcSignatureSubscribeConfig>,
+    // );
 
     // Result<TypedSubscriptionStream<Response<RpcSignatureResult>>, RpcError>
 
-    let sub : TypedSubscriptionStream<Response<RpcSignatureResult>> = foo.unwrap();
+    // let mut sub : TypedSubscriptionStream<Response<RpcSignatureResult>> = foo.map_err_anyhow().unwrap();
+    // let mut slot_sub: TypedSubscriptionStream<Arc<SlotUpdate>> = client.slots_updates_subscribe().map_err_anyhow()?;
 
-    sub.next();
+    // slot_sub.next();
+
+    // sub.next().await;
 
     // async_buy.await;
 
