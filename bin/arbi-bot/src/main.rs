@@ -148,7 +148,7 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn play_with_sigaturesubscription(ws_url: &String, mango_client: Arc<MangoClient>, rpc_client: RpcClient) {
+async fn play_with_sigaturesubscription(ws_url: &String, mango_client: Arc<MangoClient>, rpc_client: RpcClient) -> Result<(), anyhow::Error> {
     println!("Connected to {}", ws_url);
     let client = PubsubClient::new(&ws_url).await?;
 
@@ -185,6 +185,8 @@ async fn play_with_sigaturesubscription(ws_url: &String, mango_client: Arc<Mango
     info!("tx_status={:?}", tx_status);
 
     subscribe_handle.await;
+
+    Ok(())
 }
 
 fn _blockhash_poller() {

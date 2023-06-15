@@ -135,7 +135,7 @@ pub async fn listen_perp_market_feed(market_id: &str,
     // = ReconnectWs::connect("wss://api.mngo.cloud/orderbook/v1/".to_string()).await.unwrap();
     // socket.0.0.read_message();
 
-    let (mut dsocket, response) =
+    let (mut socket, response) =
         connect(Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap()).expect("Can't connect");
     //     ReconnectWs::connect("wss://api.mngo.cloud/orderbook/v1/".to_string());
     //
