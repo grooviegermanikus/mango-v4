@@ -3,8 +3,23 @@ members = [
     "bin/*",
     "programs/mango-v4",
     "lib/*",
-    "3rdparty/anchor/cli",
 ]
+
+[workspace.dependencies]
+anchor-client = "0.27.0"
+anchor-lang = "0.27.0"
+anchor-spl = "0.27.0"
+fixed = { path = "./3rdparty/fixed", version = "1.11.0" }
+pyth-sdk-solana = "0.1.0"
+serum_dex = { git = "https://github.com/openbook-dex/program.git" }
+solana-address-lookup-table-program = "~1.14.9"
+solana-account-decoder = "~1.14.9"
+solana-client = "~1.14.9"
+solana-logger = "~1.14.9"
+solana-program = "~1.14.9"
+solana-program-test = "~1.14.9"
+solana-rpc = "~1.14.9"
+solana-sdk = "~1.14.9"
 
 [profile.release]
 overflow-checks = true
@@ -12,8 +27,3 @@ overflow-checks = true
 [patch.crates-io]
 # for gzip encoded responses
 jsonrpc-core-client = { git = "https://github.com/ckamm/jsonrpc.git", branch = "ckamm/http-with-gzip" }
-# these patch anchor to use solana 1.14.9 in order to fix dependency conflicts in switchboard-v2
-# downstream applications may need to copy these patches to their own workspace
-anchor-spl = { path = "./3rdparty/anchor/spl/" }
-anchor-lang = { path = "./3rdparty/anchor/lang/" }
-switchboard-v2 = { path = "./3rdparty/switchboard-v2/rust/switchboard-v2/" }

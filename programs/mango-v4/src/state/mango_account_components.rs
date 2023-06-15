@@ -12,7 +12,7 @@ use crate::state::*;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 pub struct TokenPosition {
     // TODO: Why did we have deposits and borrows as two different values
@@ -102,7 +102,7 @@ impl TokenPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 pub struct Serum3Orders {
     pub open_orders: Pubkey,
@@ -158,7 +158,7 @@ impl Default for Serum3Orders {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
@@ -180,8 +180,15 @@ pub struct PerpPosition {
 
     /// Active position size, measured in base lots
     pub base_position_lots: i64,
-    /// Active position in quote (conversation rate is that of the time the order was settled)
-    /// measured in native quote
+
+    /// Active position in oracle quote native. At the same time this is 1:1 a settle_token native amount.
+    ///
+    /// Example: Say there's a perp market on the BTC/USD price using SOL for settlement. The user buys
+    /// one long contract for $20k, then base = 1, quote = -20k. The price goes to $21k. Now their
+    /// unsettled pnl is (1 * 21k - 20k) __SOL__ = 1000 SOL. This is because the perp contract arbitrarily
+    /// decides that each unit of price difference creates 1 SOL worth of settlement.
+    /// (yes, causing 1 SOL of settlement for each $1 price change implies a lot of extra leverage; likely
+    /// there should be an extra configurable scaling factor before we use this for cases like that)
     pub quote_position_native: I80F48,
 
     /// Tracks what the position is to calculate average entry & break even price
@@ -782,7 +789,7 @@ impl PerpPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, bytemuck::Pod)]
 pub struct PerpOpenOrder {
     pub side_and_tree: u8, // SideAndOrderTree -- enums aren't POD
     pub padding1: [u8; 1],

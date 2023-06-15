@@ -4,9 +4,89 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.14.0, 2023-4-
+### v0.17.0, 2023-6-
 
-Deployment:
+- Configurable perp market settle token (#550)
+
+  This changes perp market margining to no longer assume all pnl is in USD
+  while settlement is in USDC. Instead, a configurable settle token is used for
+  pnl and settlement, defaulting to USDC.
+
+  There is no difference while the USDC price is forced to $1 and its init and liab
+  weights are 1. But with this patch, it becomes possible to change that.
+
+  For now it is not recommended to use a token other than USDC or USDT (or
+  another USD targeting stable token) for perp settlement.
+
+  The patch also updates all instructions dealing with the insurance vault
+  to be aware that the insurance fund is not in USD but in USDC and apply the
+  USDC price before payouts. To do this, the previous
+  PerpLiqNegativePnlOrBankruptcy was replaced by a new
+  PerpLiqNegativePnlOrBankruptcyV2 instruction.
+
+- Whitelist PerpPlaceOrderV2 and PerpPlaceOrderPeggedV2 for HealthRegions (#597)
+- Improve docs (#590, #594)
+- Use workspace dependencies (#588)
+
+## mainnet
+
+### v0.16.0, 2023-5-19
+
+Deployment: May 19, 2023 at 15:35:12 Central European Summer Time, https://explorer.solana.com/tx/22fEcghPGgAnYCZkfjTxTeKQwX5rzWSx3c5CV9TikJmaAKWCpubCZYBx5ZJJPeNG1xWUPWMw3ooDhFBRYCR3tKYU
+
+- New event: PerpTakerTradeLog immediately logs your trade execution (#579, #584)
+
+  Previously you had to look at the logs from FillEvent processing to determine
+  how much was taken and what the fees were. The new PerpTakerTradeLog event
+  is emitted during PerpPlaceOrder and simplifies that.
+
+- Perp self-trade options (#533)
+
+  There are new PerpPlaceOrderV2 and PerpPlaceOrderPeggedV2 instructions that take
+  an argument that controls self-trade behavior, similar to OpenBook.
+
+  The old instructions still exist with nearly unchanged behavior: They default
+  to DecrementTake, which means being allowed to match against your own orders.
+  But now you don't pay fees if you do so.
+
+- Update anchor to v0.27.0 (#582)
+
+  Mango used to depend on a fork of anchor. Now all patches are upstreamed and
+  we have upgraded to the unmodified upstream version of v0.27.0.
+
+### v0.15.0, 2023-5-11
+
+Deployment: May 11, 2023 at 09:29:12 Central European Summer Time, https://explorer.solana.com/tx/3h6KFxLEAvifNGDBNcQrWdc6cRkpHTzFzL8VradfAXBYNfScrLJzDxm52N4RNmS9dmE84zDuwbErQ75RcxDcihY3
+
+- Change TokenRegisterTrustless instruction to disable borrows by default (#567)
+
+  The instruction is intended to use very conservative defaults for listing
+  tokens. It now lists new tokens with zero asset weights and without allowing
+  borrowing, which should leave oracle staleness and potential bugs as the main
+  risks of listing new tokens.
+
+- OpenBook place order instruction: Respect reduce-only flags on the base and
+  quote bank (#569)
+
+  This way the DAO can potentially leave related OpenBook markets open when it
+  marks a token as reduce-only.
+
+- FlashLoan: Whitelist the ComputeBudget program when called by delegates (#572)
+
+  For convenience. When constructing a flash loan instruction for a delegated
+  account, users no longer need to take care to remove compute budget
+  instructions from the flash loan scope.
+
+- Perp Order Matching: Exit when no lots can be filled due to the quote limit (#576)
+
+  Previously it would keep looping unnecessarily.
+
+- Improve error message for incorrect number of accounts in FixedAccountRetriever (#566)
+- Add oracle confidence and type information to perp update funding logs (#568)
+
+### v0.14.0, 2023-4-29
+
+Deployment: Apr 29, 2023 at 11:58:43 Central European Summer Time, https://explorer.solana.com/tx/2iaLQTT6PqFjFQr94j5g2iUhDT9v6CJk5rNC9mY7cY7BfRjn6pWixnUF5Wv2qAAUq4hmEvM7WyajDxQjq6QbufSk
 
 - Force-closing of perp positions (#525)
 
@@ -31,8 +111,6 @@ Deployment:
 - Improve logging on force-close instructions (#555)
 - Fix perp order seqnum logging (#556)
 - Fix build when using mango-v4 code with the "no-entrypoint" feature (#558)
-
-## mainnet
 
 ### v0.13.0, 2023-4-18
 

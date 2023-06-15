@@ -1582,12 +1582,8 @@ export class MangoClient {
       const baseTokenIndex = serum3Market.baseTokenIndex;
       const quoteTokenIndex = serum3Market.quoteTokenIndex;
       // only include banks if no deposit has been previously made for same token
-      if (!mangoAccount.getToken(baseTokenIndex)?.isActive()) {
-        banks.push(group.getFirstBankByTokenIndex(baseTokenIndex));
-      }
-      if (!mangoAccount.getToken(quoteTokenIndex)?.isActive()) {
-        banks.push(group.getFirstBankByTokenIndex(quoteTokenIndex));
-      }
+      banks.push(group.getFirstBankByTokenIndex(quoteTokenIndex));
+      banks.push(group.getFirstBankByTokenIndex(baseTokenIndex));
     }
 
     const healthRemainingAccounts: PublicKey[] =
@@ -1613,10 +1609,12 @@ export class MangoClient {
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
     const isTaker = orderType !== Serum3OrderType.postOnly;
     const maxQuoteQuantity = new BN(
-      serum3MarketExternal.decoded.quoteLotSize.toNumber() *
-        (1 + Math.max(serum3Market.getFeeRates(isTaker), 0)) *
-        serum3MarketExternal.baseSizeNumberToLots(size).toNumber() *
-        serum3MarketExternal.priceNumberToLots(price).toNumber(),
+      Math.ceil(
+        serum3MarketExternal.decoded.quoteLotSize.toNumber() *
+          (1 + Math.max(serum3Market.getFeeRates(isTaker), 0)) *
+          serum3MarketExternal.baseSizeNumberToLots(size).toNumber() *
+          serum3MarketExternal.priceNumberToLots(price).toNumber(),
+      ),
     );
 
     const payerTokenIndex = ((): TokenIndex => {
@@ -3111,11 +3109,9 @@ export class MangoClient {
   ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
-    const tokenPositionIndices = uniq(
-      mangoAccounts
-        .map((mangoAccount) => mangoAccount.tokens.map((t) => t.tokenIndex))
-        .flat(),
-    );
+    const tokenPositionIndices = mangoAccounts
+      .map((mangoAccount) => mangoAccount.tokens.map((t) => t.tokenIndex))
+      .flat();
     for (const bank of banks) {
       const tokenPositionExists =
         tokenPositionIndices.indexOf(bank.tokenIndex) > -1;
@@ -3128,9 +3124,14 @@ export class MangoClient {
         }
       }
     }
-    const mintInfos = tokenPositionIndices
-      .filter((tokenIndex) => tokenIndex !== TokenPosition.TokenIndexUnset)
-      .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!);
+    const mintInfos = uniq(
+      tokenPositionIndices
+        .filter((tokenIndex) => tokenIndex !== TokenPosition.TokenIndexUnset)
+        .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!),
+      (mintInfo) => {
+        mintInfo.tokenIndex;
+      },
+    );
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
     );
@@ -3139,11 +3140,9 @@ export class MangoClient {
     );
 
     // Insert any extra perp markets in the free perp position slots
-    const perpPositionsMarketIndices = uniq(
-      mangoAccounts
-        .map((mangoAccount) => mangoAccount.perps.map((p) => p.marketIndex))
-        .flat(),
-    );
+    const perpPositionsMarketIndices = mangoAccounts
+      .map((mangoAccount) => mangoAccount.perps.map((p) => p.marketIndex))
+      .flat();
     for (const perpMarket of perpMarkets) {
       const perpPositionExists =
         perpPositionsMarketIndices.indexOf(perpMarket.perpMarketIndex) > -1;
@@ -3157,12 +3156,15 @@ export class MangoClient {
         }
       }
     }
-    const allPerpMarkets = perpPositionsMarketIndices
-      .filter(
-        (perpMarktIndex) =>
-          perpMarktIndex !== PerpPosition.PerpMarketIndexUnset,
-      )
-      .map((perpIdx) => group.getPerpMarketByMarketIndex(perpIdx)!);
+    const allPerpMarkets = uniq(
+      perpPositionsMarketIndices
+        .filter(
+          (perpMarktIndex) =>
+            perpMarktIndex !== PerpPosition.PerpMarketIndexUnset,
+        )
+        .map((perpIdx) => group.getPerpMarketByMarketIndex(perpIdx)!),
+      (pm) => pm.perpMarketIndex,
+    );
     healthRemainingAccounts.push(
       ...allPerpMarkets.map((perp) => perp.publicKey),
     );

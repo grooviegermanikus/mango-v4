@@ -3,17 +3,7 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { expect } from 'chai';
 import fs from 'fs';
 import { Group } from '../../src/accounts/group';
-import { HealthType } from '../../src/accounts/mangoAccount';
-import {
-  PerpMarketIndex,
-  PerpOrderSide,
-  PerpOrderType,
-} from '../../src/accounts/perp';
-import {
-  Serum3OrderType,
-  Serum3SelfTradeBehavior,
-  Serum3Side,
-} from '../../src/accounts/serum3';
+import { PerpOrderSide, PerpOrderType } from '../../src/accounts/perp';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 import { toUiDecimalsForQuote } from '../../src/utils';
@@ -130,6 +120,7 @@ async function main(): Promise<void> {
 
     // deposit USDC
     let oldBalance = mangoAccount.getTokenBalance(
+      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     await client.tokenDeposit(
@@ -140,6 +131,7 @@ async function main(): Promise<void> {
     );
     await mangoAccount.reload(client);
     let newBalance = mangoAccount.getTokenBalance(
+      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     expect(toUiDecimalsForQuote(newBalance.sub(oldBalance)).toString()).equals(
@@ -167,6 +159,7 @@ async function main(): Promise<void> {
     // withdraw USDC
     console.log(`...withdrawing 1 USDC`);
     oldBalance = mangoAccount.getTokenBalance(
+      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     await client.tokenWithdraw(
@@ -178,6 +171,7 @@ async function main(): Promise<void> {
     );
     await mangoAccount.reload(client);
     newBalance = mangoAccount.getTokenBalance(
+      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     expect(toUiDecimalsForQuote(oldBalance.sub(newBalance)).toString()).equals(
@@ -335,15 +329,11 @@ async function main(): Promise<void> {
     );
     console.log(
       '...mangoAccount.getAssetsVal() ' +
-        toUiDecimalsForQuote(
-          mangoAccount.getAssetsValue(group, HealthType.init)!.toNumber(),
-        ),
+        toUiDecimalsForQuote(mangoAccount.getAssetsValue(group)!.toNumber()),
     );
     console.log(
       '...mangoAccount.getLiabsVal() ' +
-        toUiDecimalsForQuote(
-          mangoAccount.getLiabsValue(group, HealthType.init)!.toNumber(),
-        ),
+        toUiDecimalsForQuote(mangoAccount.getLiabsValue(group)!.toNumber()),
     );
     console.log(
       '...mangoAccount.getMaxWithdrawWithBorrowForToken(group, "SOL") ' +

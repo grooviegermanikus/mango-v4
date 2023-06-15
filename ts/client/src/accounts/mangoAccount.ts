@@ -236,6 +236,27 @@ export class MangoAccount {
     return tp ? tp.balance(bank) : ZERO_I80F48();
   }
 
+  // TODO: once perp quote is merged, also add in the settle token balance if relevant
+  public getEffectiveTokenBalance(group: Group, bank: Bank): I80F48 {
+    const tp = this.getToken(bank.tokenIndex);
+    if (tp) {
+      const bal = tp.balance(bank);
+      for (const serum3Market of Array.from(
+        group.serum3MarketsMapByMarketIndex.values(),
+      )) {
+        const oo = this.serum3OosMapByMarketIndex.get(serum3Market.marketIndex);
+        if (serum3Market.baseTokenIndex == bank.tokenIndex && oo) {
+          bal.add(I80F48.fromI64(oo.baseTokenFree));
+        }
+        if (serum3Market.quoteTokenIndex == bank.tokenIndex && oo) {
+          bal.add(I80F48.fromI64(oo.quoteTokenFree));
+        }
+      }
+      return bal;
+    }
+    return ZERO_I80F48();
+  }
+
   /**
    *
    * @param bank
@@ -296,9 +317,12 @@ export class MangoAccount {
     return hc.health(healthType);
   }
 
-  public getPerpSettleHealth(group: Group): I80F48 {
+  public perpMaxSettle(
+    group: Group,
+    perpMarketSettleTokenIndex: TokenIndex,
+  ): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.perpSettleHealth();
+    return hc.perpMaxSettle(perpMarketSettleTokenIndex);
   }
 
   /**
@@ -340,15 +364,9 @@ export class MangoAccount {
         .get(baseBank.tokenIndex)!
         .iadd(I80F48.fromI64(oo.baseTokenTotal).mul(baseBank.price));
       const quoteBank = group.getFirstBankByTokenIndex(sp.quoteTokenIndex);
-      // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
-      // is aware of it
       tokensMap
         .get(baseBank.tokenIndex)!
-        .iadd(
-          I80F48.fromI64(
-            oo.quoteTokenTotal.add((oo as any).referrerRebatesAccrued),
-          ).mul(quoteBank.price),
-        );
+        .iadd(I80F48.fromI64(oo.quoteTokenTotal).mul(quoteBank.price));
     }
 
     const tokenEquity = Array.from(tokensMap.values()).reduce(
@@ -377,18 +395,18 @@ export class MangoAccount {
    * Sum of all positive assets.
    * @returns assets, in native quote
    */
-  public getAssetsValue(group: Group, healthType?: HealthType): I80F48 {
+  public getAssetsValue(group: Group): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.assets(healthType);
+    return hc.healthAssetsAndLiabs(undefined, false).assets;
   }
 
   /**
    * Sum of all negative assets.
    * @returns liabs, in native quote
    */
-  public getLiabsValue(group: Group, healthType?: HealthType): I80F48 {
+  public getLiabsValue(group: Group): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.liabs(healthType);
+    return hc.healthAssetsAndLiabs(undefined, false).liabs;
   }
 
   /**
@@ -445,6 +463,7 @@ export class MangoAccount {
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    *
    * TODO: take into account net_borrow_limit and min_vault_to_deposits_ratio
+   * TODO: see max_borrow_for_health_fn
    */
   public getMaxWithdrawWithBorrowForToken(
     group: Group,
@@ -550,7 +569,7 @@ export class MangoAccount {
             Math.pow(10, targetBank.mintDecimals - sourceBank.mintDecimals)),
       ),
     );
-    const sourceBalance = this.getTokenBalance(sourceBank);
+    const sourceBalance = this.getEffectiveTokenBalance(group, sourceBank);
     if (maxSource.gt(sourceBalance)) {
       const sourceBorrow = maxSource.sub(sourceBalance);
       maxSource = sourceBalance.add(
@@ -686,7 +705,7 @@ export class MangoAccount {
     let quoteAmount = nativeAmount.div(quoteBank.price);
     // If its a bid then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
-    const quoteBalance = this.getTokenBalance(quoteBank);
+    const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
     if (quoteAmount.gt(quoteBalance)) {
       const quoteBorrow = quoteAmount.sub(quoteBalance);
       quoteAmount = quoteBalance.add(
@@ -696,7 +715,7 @@ export class MangoAccount {
     quoteAmount = quoteAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
-    return toUiDecimals(nativeAmount, quoteBank.mintDecimals);
+    return toUiDecimals(quoteAmount, quoteBank.mintDecimals);
   }
 
   /**
@@ -728,7 +747,7 @@ export class MangoAccount {
     let baseAmount = nativeAmount.div(baseBank.price);
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
-    const baseBalance = this.getTokenBalance(baseBank);
+    const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
     if (baseAmount.gt(baseBalance)) {
       const baseBorrow = baseAmount.sub(baseBalance);
       baseAmount = baseBalance.add(
@@ -1539,13 +1558,16 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
     this.updateSettleLimit(perpMarket);
-    const perpSettleHealth = account.getPerpSettleHealth(group);
+    const perpMaxSettle = account.perpMaxSettle(
+      group,
+      perpMarket.settleTokenIndex,
+    );
     const limitedUnsettled = this.applyPnlSettleLimit(
       this.getUnsettledPnl(perpMarket),
       perpMarket,
     );
     if (limitedUnsettled.lt(ZERO_I80F48())) {
-      return limitedUnsettled.max(perpSettleHealth.max(ZERO_I80F48()).neg());
+      return limitedUnsettled.max(perpMaxSettle.max(ZERO_I80F48()).neg());
     }
     return limitedUnsettled;
   }
