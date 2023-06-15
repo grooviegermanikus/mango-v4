@@ -3,7 +3,6 @@ mod services;
 mod coordinator;
 mod numerics;
 
-use solana_rpc::rpc_pubsub::{RpcSolPubSub, RpcSolPubSubClient};
 use std::future::Future;
 use std::rc::Rc;
 use clap::{Args, Parser, Subcommand};
@@ -65,6 +64,8 @@ struct Cli {
     // command: Command,
 }
 
+
+// command args for testnet see /Users/stefan/mango/notes/BOT1
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(
@@ -100,8 +101,8 @@ async fn main() -> Result<(), anyhow::Error> {
         ).await?);
 
 
-    // let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
-    // coordinator_thread.await?;
+    let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
+    coordinator_thread.await?;
 
     // play with confirmation
     // let async_buy = swap_buy_asset(mango_client.clone());

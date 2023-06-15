@@ -2978,7 +2978,9 @@ dependencies = [
  "env_logger 0.8.4",
  "fixed",
  "futures 0.3.25",
- "itertools 0.10.5",
+ "itertools",
+ "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-core-client",
  "log 0.4.17",
  "mango-v4",
  "mango-v4-client",
@@ -2987,9 +2989,10 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serum_dex 0.5.10",
+ "serum_dex",
  "solana-client",
  "solana-sdk",
+ "stream-reconnect",
  "tokio",
  "tokio-tungstenite 0.17.2",
  "url 2.3.1",
@@ -6509,6 +6512,17 @@ checksum = "7b0a9eb2715209fb8cc0d942fcdff45674bfc9f0090a0d897e85a22955ad159b"
 dependencies = [
  "futures-core",
  "pin-project",
+ "tokio",
+]
+
+[[package]]
+name = "stream-reconnect"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9831f47a89f0d699b3a0c74ae7c48b30974ccca14a571f342a0eb41b6f7f2a56"
+dependencies = [
+ "futures 0.3.25",
+ "log 0.4.17",
  "tokio",
 ]
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use chrono::Utc;
 use solana_sdk::pubkey::Pubkey;
-use mango_v4::state::{PerpMarket, PlaceOrderType, Side};
+use mango_v4::state::{PerpMarket, PlaceOrderType, SelfTradeBehavior, Side};
 use mango_v4_client::{JupiterSwapMode, MangoClient};
 use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 use crate::numerics::{ConversionConf, native_amount, native_amount2, native_amount_to_lot, quote_amount_to_lot};
@@ -114,7 +114,8 @@ pub async fn perp_bid_asset(mango_client: Arc<MangoClient>, client_order_id: u64
         PlaceOrderType::Market,
         false,
         0,
-        64 // max num orders to be skipped based on expiry information in the orderbook
+        64, // max num orders to be skipped based on expiry information in the orderbook
+        SelfTradeBehavior::DecrementTake,
     ).await;
 
     debug!("tx-sig perp-bid: {:?}", sig);
@@ -144,7 +145,8 @@ pub async fn perp_ask_asset(mango_client: Arc<MangoClient>) -> Signature {
         PlaceOrderType::Market,
         false,
         0,
-        64 // max num orders to be skipped based on expiry information in the orderbook
+        64, // max num orders to be skipped based on expiry information in the orderbook
+        SelfTradeBehavior::DecrementTake,
     ).await;
 
     debug!("tx-sig perp-ask: {:?}", sig);
