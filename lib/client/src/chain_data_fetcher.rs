@@ -10,6 +10,7 @@ use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use mango_v4::state::{MangoAccount, MangoAccountValue};
 
 use anyhow::Context;
+use log::debug;
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
@@ -196,5 +197,9 @@ impl crate::AccountFetcher for AccountFetcher {
                 Some((*pk, data.account.clone()))
             })
             .collect::<Vec<_>>())
+    }
+
+    async fn clear_cache(&self) {
+        debug!("account cache not supported - clear_cache is a noop");
     }
 }

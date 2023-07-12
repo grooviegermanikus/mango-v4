@@ -8,6 +8,7 @@ use anyhow::Context;
 
 use anchor_client::ClientError;
 use anchor_lang::AccountDeserialize;
+use log::{debug, info};
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
@@ -29,6 +30,7 @@ pub trait AccountFetcher: Sync + Send {
         program: &Pubkey,
         discriminator: [u8; 8],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
+    async fn clear_cache(&self);
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...
@@ -99,6 +101,10 @@ impl AccountFetcher for RpcAccountFetcher {
             .into_iter()
             .map(|(pk, acc)| (pk, acc.into()))
             .collect::<Vec<_>>())
+    }
+
+    async fn clear_cache(&self) {
+        debug!("account cache not supported - clear_cache is a noop");
     }
 }
 
@@ -260,5 +266,10 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
                 err
             )),
         }
+    }
+
+    async fn clear_cache(&self) {
+        info!("Clearing account cache");
+        self.clear_cache();
     }
 }
