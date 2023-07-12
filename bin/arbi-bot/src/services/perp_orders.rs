@@ -160,7 +160,7 @@ pub async fn calc_perp_position_allowance(mango_client: Arc<MangoClient>) -> Per
         }
 
     } else {
-        Both
+        PerpAllowance::Both
     }
 }
 
