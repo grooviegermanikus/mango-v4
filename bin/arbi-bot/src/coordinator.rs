@@ -83,6 +83,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
         }
     });
 
+    // TODO crashing thread should stop the whole program
     let poll_orderbook = tokio::spawn({
         let last_bid_price = coo.last_bid_price_shared.clone();
         let last_ask_price = coo.last_ask_price_shared.clone();
@@ -120,6 +121,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                     if should_trade(profit) {
                         info!("profitable trade swap2perp detected, starting trade sequence ...");
                         trade_sequence_swap2perp(mc.clone()).await;
+                        post_trade(mc.clone());
                         throttle.tick().await;
                     }
                 }
@@ -157,6 +159,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                     if should_trade(profit) {
                         info!("profitable trade perp2swap detected, starting trade sequence ...");
                         trade_sequence_perp2swap(mc.clone()).await;
+                        post_trade(mc.clone());
                         throttle.tick().await;
                     }
                 }
@@ -173,10 +176,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
     // mango_client.mango_account().await.unwrap().
 
-
-    // block forever
-    main_swap2perp_poller.await.unwrap();
-    main_perp2swap_poller.await.unwrap();
+    join!(poll_buy_price, poll_sell_price, poll_orderbook);
 
 }
 
@@ -247,4 +247,10 @@ fn drain_swap_sell_feed(feed: &mut UnboundedReceiver<SwapSellPrice>) -> Option<S
 fn should_trade(profit: f64) -> bool {
     // 1 bps = 0.0001 = 0.01%
     profit > 0.002 // 0.2%
+}
+
+async fn post_trade(mango_client: Arc<MangoClient>) {
+    info!("post-trade cleanup ...");
+    // clear cache - data will be reloaded by .mango_account() call
+    mango_client.account_fetcher.clear_cache().await;
 }

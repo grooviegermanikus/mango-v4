@@ -149,7 +149,6 @@ pub async fn calc_perp_position_allowance(mango_client: Arc<MangoClient>) -> Per
         let base_native: i64 = position.base_position_native(&perp_market).to_num();
         let base_ui = base_native as f64 / 10f64.powi(perp_market.base_decimals as i32);
 
-        // only one
 
         if base_ui > 0.02 {
             PerpAllowance::NoLong

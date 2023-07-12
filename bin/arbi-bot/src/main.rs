@@ -100,6 +100,7 @@ async fn main() -> Result<(), anyhow::Error> {
             owner.clone(),
         ).await?);
 
+    info!("Starting arbi-bot to {} ...", rpc_url);
 
     let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
     coordinator_thread.await?;
