@@ -20,7 +20,7 @@ use services::orderbook_stream_sell::listen_perp_market_feed;
 
 use crate::{mango, services};
 use crate::services::asset_price_swap::{SwapBuyPrice, SwapSellPrice};
-use crate::services::perp_orders::{perp_ask_asset, perp_bid_asset, perp_bid_blocking_until_fill};
+use crate::services::perp_orders::{calc_perp_position_allowance, perp_ask_asset, perp_bid_asset, perp_bid_blocking_until_fill, PerpAllowance};
 use crate::services::swap_orders::{swap_buy_asset, swap_sell_asset};
 
 const DRY_RUN: bool = true;
@@ -102,6 +102,12 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
             info!("Entering coordinator JUPITER->ETH-PERP loop (interval={:?}) ...", poll_interval.period());
             loop {
 
+                if matches!(calc_perp_position_allowance(mc.clone()).await, PerpAllowance::NoShort) {
+                    debug!("no perp short position allowance, skipping ...");
+                    poll_interval.tick().await;
+                    continue;
+                }
+
                 let latest_swap_buy = drain_swap_buy_feed(&mut coo.buy_price_stream);
                 debug!("swap latest buy price {:?}", latest_swap_buy);
 
@@ -110,7 +116,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
                 if let (Some(perp_bid), Some(swap_buy)) = (*orderbook_bid, latest_swap_buy) {
                     let profit = (perp_bid - swap_buy.price) / swap_buy.price;
-                    info!("perp-bid {:.2?} vs swap-buy {:.2?}, profit {:.2?}%", perp_bid, swap_buy.price, 100.0 * profit);
+                    info!("perp-bid {:.2?} vs swap-buy {:.2?}, expected profit {:.2?}%", perp_bid, swap_buy.price, 100.0 * profit);
                     if should_trade(profit) {
                         info!("profitable trade swap2perp detected, starting trade sequence ...");
                         trade_sequence_swap2perp(mc.clone()).await;
@@ -132,6 +138,12 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
             let mut throttle = interval(TRADING_COOLDOWN);
             info!("Entering coordinator ETH-PERP->JUPITER loop (interval={:?}) ...", poll_interval.period());
             loop {
+                if matches!(calc_perp_position_allowance(mc.clone()).await, PerpAllowance::NoLong) {
+                    debug!("no perp long position allowance, skipping ...");
+                    poll_interval.tick().await;
+                    continue;
+                }
+
                 let orderbook_ask = last_ask_price.read().await;
                 debug!("orderbook(perp) best ask {:?}", *orderbook_ask);
 
@@ -140,7 +152,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
                 if let (Some(perp_ask), Some(swap_sell)) = (*orderbook_ask, latest_swap_sell) {
                     let profit = (swap_sell.price - perp_ask) / perp_ask;
-                    info!("swap-sell {:.2?} vs perp-ask {:.2?}, profit {:.2?}%", swap_sell.price, perp_ask, 100.0 * profit);
+                    info!("swap-sell {:.2?} vs perp-ask {:.2?}, expected profit {:.2?}%", swap_sell.price, perp_ask, 100.0 * profit);
 
                     if should_trade(profit) {
                         info!("profitable trade perp2swap detected, starting trade sequence ...");
@@ -177,7 +189,7 @@ async fn trade_sequence_swap2perp(mango_client: Arc<MangoClient>) {
 
     // must be unique
 
-    debug!("starting swap->perp trade sequence ...");
+    info!("starting swap->perp trade sequence ...");
 
     let async_buy = swap_buy_asset(mango_client.clone());
     // TODO check for confirmed state (ask max)
@@ -186,9 +198,9 @@ async fn trade_sequence_swap2perp(mango_client: Arc<MangoClient>) {
 
     let (sig_buy, sig_ask) = join!(async_buy, async_ask);
 
-    debug!("dispatched trading pair with signatures {} and {}", sig_buy, sig_ask);
+    info!("dispatched trading pair with signatures {} and {}", sig_buy, sig_ask);
 
-    debug!("trade sequence completed.");
+    info!("trade sequence completed.");
 }
 
 async fn trade_sequence_perp2swap(mango_client: Arc<MangoClient>) {
@@ -198,7 +210,7 @@ async fn trade_sequence_perp2swap(mango_client: Arc<MangoClient>) {
     }
     // must be unique
     let client_order_id = Utc::now().timestamp_micros() as u64;
-    debug!("starting perp->swap trade sequence (client_order_id {}) ...", client_order_id);
+    info!("starting perp->swap trade sequence (client_order_id {}) ...", client_order_id);
 
     let async_bid = perp_bid_asset(mango_client.clone(), client_order_id);
     // TODO check for confirmed state (ask max)
@@ -207,9 +219,9 @@ async fn trade_sequence_perp2swap(mango_client: Arc<MangoClient>) {
 
     let (sig_bid, sig_sell) = join!(async_bid, async_sell);
 
-    debug!("dispatched trading pair with signatures {} and {}", sig_bid, sig_sell);
+    info!("dispatched trading pair with signatures {} and {}", sig_bid, sig_sell);
 
-    debug!("trade sequence completed.");
+    info!("trade sequence completed.");
 }
 
 
@@ -233,5 +245,6 @@ fn drain_swap_sell_feed(feed: &mut UnboundedReceiver<SwapSellPrice>) -> Option<S
 }
 
 fn should_trade(profit: f64) -> bool {
-    profit > 0.004 // 0.4%
+    // 1 bps = 0.0001 = 0.01%
+    profit > 0.002 // 0.2%
 }

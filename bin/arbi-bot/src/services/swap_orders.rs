@@ -12,19 +12,21 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use solana_sdk::signature::Signature;
 
+// bps
+const SLIPPAGE: u64 = 5;
 
 pub async fn swap_sell_asset(mango_client: Arc<MangoClient>) -> Signature {
     let market_index = mango_client.context.token_indexes_by_name.get("ETH (Portal)").unwrap();
     let market = mango_client.context.tokens.get(market_index).unwrap();
 
-    let order_size_sell = native_amount2(market.decimals as u32, 0.0001);
+    let order_size_sell = native_amount2(market.decimals as u32, 0.001);
 
     debug!("swap order sell with size {:?}", order_size_sell);
     let sig_sell = mango_client.jupiter_swap(
         Pubkey::from_str(MINT_ADDRESS_ETH).unwrap(),
         Pubkey::from_str(MINT_ADDRESS_USDC).unwrap(),
         order_size_sell,
-        10, // TODO 0.1%, 100=1% make configurable
+        SLIPPAGE, // TODO 0.01%, 100=1% make configurable
         JupiterSwapMode::ExactIn
     ).await;
 
@@ -38,14 +40,14 @@ pub async fn swap_buy_asset(mango_client: Arc<MangoClient>) -> Signature {
     let market_index = mango_client.context.token_indexes_by_name.get("ETH (Portal)").unwrap();
     let market = mango_client.context.tokens.get(market_index).unwrap();
 
-    let order_size_buy = native_amount2(market.decimals as u32, 0.0001);
+    let order_size_buy = native_amount2(market.decimals as u32, 0.001);
 
     debug!("swap order buy with size {:?}", order_size_buy);
     let sig_buy = mango_client.jupiter_swap(
         Pubkey::from_str(MINT_ADDRESS_USDC).unwrap(),
         Pubkey::from_str(MINT_ADDRESS_ETH).unwrap(),
         order_size_buy,
-        10, // TODO 0.1%, 100=1% make configurable
+        SLIPPAGE, // TODO 0.1%, 100=1% make configurable
         JupiterSwapMode::ExactOut
     ).await;
 
