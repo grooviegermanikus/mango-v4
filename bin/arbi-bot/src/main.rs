@@ -32,7 +32,7 @@ use crate::numerics::{native_amount, native_amount_to_lot, quote_amount_to_lot};
 use crate::services::blockhash::start_blockhash_service;
 use crate::services::perp_orders::{perp_bid_asset, perp_ask_asset, calc_perp_position_allowance};
 use crate::services::swap_orders::swap_buy_asset;
-use crate::services::transactions;
+use crate::services::{trading_config, transactions};
 
 use solana_client::rpc_response::SlotUpdate;
 use jsonrpc_core::futures::StreamExt;
@@ -88,7 +88,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
 
-    info!("Starting arbi-bot{} to {} ...", if dry_run { "(DRYRUN)" } else { "" }, rpc_url);
+    info!("Starting arbi-bot{} to {} trading '{}' vs '{}' ...", if dry_run { "(DRYRUN)" } else { "" },
+        rpc_url, trading_config::PERP_MARKET_NAME, trading_config::TOKEN_NAME);
 
     let mango_client = Arc::new(
         MangoClient::new_for_existing_account(

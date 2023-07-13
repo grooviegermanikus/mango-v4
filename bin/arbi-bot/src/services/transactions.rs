@@ -71,8 +71,8 @@ pub async fn on_signature() -> anyhow::Result<()> {
     println!("subscribed");
 
 
-    while let msg = socket.read_message() {
-
+    loop {
+        let msg = socket.read_message();
         if let Message::Text(s) = msg.unwrap() {
             let plain = from_str::<Value>(&s).expect("Can't parse to JSON");
             println!("Received: {}", plain);
@@ -91,11 +91,8 @@ pub async fn on_signature() -> anyhow::Result<()> {
             //     return Ok(());
             // }
         }
+    } // -- loop
 
-    } // -- while
 
-    panic!("foo");
-
-    // return Err(anyhow!("Can't find fill event for client order id: {}", search_order_client_id));
-
+    panic!("endless loop");
 }

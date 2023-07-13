@@ -6,6 +6,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use crate::services::orderbook_stream::OrderstreamPrice;
 use crate::services::trading_config;
+use crate::services::trading_config::BASE_DECIMALS;
 
 #[derive(Debug, Copy, Clone)]
 pub struct SwapBuyPrice {
@@ -25,8 +26,7 @@ pub struct SwapSellPrice {
 // max(sell)
 fn calc_price_exactin(response: Vec<SwapQueryResult>) -> f64 {
     let usd_decimals = 6;
-    let eth_decimals = 8;
-    let decimals = eth_decimals - usd_decimals;
+    let decimals = BASE_DECIMALS - usd_decimals;
     let multiplier = 10f64.powf(decimals.into()) as f64;
 
     response.into_iter()
@@ -42,8 +42,7 @@ fn calc_price_exactin(response: Vec<SwapQueryResult>) -> f64 {
 // min(buy)
 fn calc_price_exactout(response: Vec<SwapQueryResult>) -> f64 {
     let usd_decimals = 6;
-    let eth_decimals = 8;
-    let decimals = eth_decimals - usd_decimals;
+    let decimals = BASE_DECIMALS - usd_decimals;
     let multiplier = 10f64.powf(decimals.into()) as f64;
 
     response.into_iter()

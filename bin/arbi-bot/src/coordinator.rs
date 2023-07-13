@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::{Arc, Condvar};
 use std::thread;
 use std::time::Duration;
@@ -21,7 +20,7 @@ use crate::services::asset_price_swap::{SwapBuyPrice, SwapSellPrice};
 use crate::services::orderbook_stream::{listen_perp_market_feed, PriceInfo};
 use crate::services::perp_orders::{calc_perp_position_allowance, perp_ask_asset, perp_bid_asset, perp_bid_blocking_until_fill, PerpAllowance};
 use crate::services::swap_orders::{swap_buy_asset, swap_sell_asset};
-use crate::services::trading_config::{AMOUNT_UI, MARKET};
+use crate::services::trading_config::{BASE_QTY_UI, MARKET};
 
 const DRY_RUN: bool = true;
 
@@ -193,7 +192,7 @@ async fn trade_sequence_swap2perp(mango_client: Arc<MangoClient>) {
 
     info!("starting swap->perp trade sequence ...");
 
-    let swap_buy = swap_buy_asset(mango_client.clone(), AMOUNT_UI).await;
+    let swap_buy = swap_buy_asset(mango_client.clone(), BASE_QTY_UI).await;
     // TODO check for confirmed state (ask max)
 
     if let Err(err) = swap_buy {
@@ -201,7 +200,7 @@ async fn trade_sequence_swap2perp(mango_client: Arc<MangoClient>) {
         return;
     }
 
-    let async_ask = perp_ask_asset(mango_client.clone(), AMOUNT_UI);
+    let async_ask = perp_ask_asset(mango_client.clone(), BASE_QTY_UI);
 
     let (sig_ask) = join!(async_ask);
 
@@ -215,10 +214,10 @@ async fn trade_sequence_perp2swap(mango_client: Arc<MangoClient>) {
     let client_order_id = Utc::now().timestamp_micros() as u64;
     info!("starting perp->swap trade sequence (client_order_id {}) ...", client_order_id);
 
-    let async_bid = perp_bid_asset(mango_client.clone(), client_order_id, AMOUNT_UI);
+    let async_bid = perp_bid_asset(mango_client.clone(), client_order_id, BASE_QTY_UI);
     // TODO check for confirmed state (ask max)
 
-    let swap_sell = swap_sell_asset(mango_client.clone(), AMOUNT_UI).await;
+    let swap_sell = swap_sell_asset(mango_client.clone(), BASE_QTY_UI).await;
 
     if let Err(err) = swap_sell {
         info!("Swap sell failed, aborting trade sequence (!!! perp positions will remain open): {}", err);

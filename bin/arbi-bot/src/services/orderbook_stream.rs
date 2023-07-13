@@ -140,9 +140,9 @@ pub async fn listen_perp_market_feed(market_id: &str,
             "marketId": market_id.to_string(),
         });
 
-    let mut socket = StableWebSocket::new(
+    let mut socket = StableWebSocket::new_with_timeout(
         Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap(),
-subscription_request).await.unwrap();
+subscription_request, Duration::from_secs(5)).await.unwrap();
 
     while let Some(ws_message) = socket.get_message_channel().recv().await {
         let WsMessage::Text(plain) = ws_message else { continue; };

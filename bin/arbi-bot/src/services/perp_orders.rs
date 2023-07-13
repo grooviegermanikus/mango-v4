@@ -9,7 +9,7 @@ use std::iter::Filter;
 use std::ops::Deref;
 use std::str::FromStr;
 use anyhow::anyhow;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Subcommand};
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Value};
@@ -137,7 +137,7 @@ pub async fn calc_perp_position_allowance(mango_client: Arc<MangoClient>) -> Per
     // reload
     mango_client.account_fetcher.clear_cache().await;
 
-    let market_index = mango_client.context.perp_market_indexes_by_name.get("ZZZZ-PERP").unwrap();
+    let market_index = mango_client.context.perp_market_indexes_by_name.get(trading_config::PERP_MARKET_NAME).unwrap();
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
     let mango_account = mango_client.mango_account().await.unwrap();
 
@@ -155,9 +155,9 @@ pub async fn calc_perp_position_allowance(mango_client: Arc<MangoClient>) -> Per
 
         debug!("perp position size: {}", base_ui);
 
-        if base_ui > 0.02 {
+        if base_ui > trading_config::PERP_ALLOWANCE_THRESHOLD_BASE_UI {
             PerpAllowance::NoLong
-        } else if base_ui < -0.02 {
+        } else if base_ui < -trading_config::PERP_ALLOWANCE_THRESHOLD_BASE_UI {
             PerpAllowance::NoShort
         } else {
             PerpAllowance::Both
