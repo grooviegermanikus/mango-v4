@@ -118,8 +118,12 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
                 if let (Some(perp_bid), Some(swap_buy)) = (*orderbook_bid, latest_swap_buy) {
                     let profit = (perp_bid - swap_buy.price) / swap_buy.price;
-                    info!("perp-bid {:.2?} vs swap-buy {:.2?}, expected profit {:.2?}%", perp_bid, swap_buy.price, 100.0 * profit);
-                    if should_trade(profit) {
+                    let should_trade = should_trade(profit);
+                    info!("{} perp-bid {:.2?} vs swap-buy {:.2?}, expected profit {:.2?}%",
+                        if should_trade { "*" } else { "." }
+                        perp_bid, swap_buy.price, 100.0 * profit);
+
+                    if should_trade {
                         info!("profitable trade swap2perp detected, starting trade sequence ...");
                         trade_sequence_swap2perp(mc.clone()).await;
                         post_trade(mc.clone());
@@ -155,9 +159,12 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
                 if let (Some(perp_ask), Some(swap_sell)) = (*orderbook_ask, latest_swap_sell) {
                     let profit = (swap_sell.price - perp_ask) / perp_ask;
-                    info!("swap-sell {:.2?} vs perp-ask {:.2?}, expected profit {:.2?}%", swap_sell.price, perp_ask, 100.0 * profit);
+                    let should_trade = should_trade(profit);
+                    info!("{} swap-sell {:.2?} vs perp-ask {:.2?}, expected profit {:.2?}%",
+                        if should_trade { "*" } else { "." },
+                        swap_sell.price, perp_ask, 100.0 * profit);
 
-                    if should_trade(profit) {
+                    if should_trade {
                         info!("profitable trade perp2swap detected, starting trade sequence ...");
                         trade_sequence_perp2swap(mc.clone()).await;
                         post_trade(mc.clone());
