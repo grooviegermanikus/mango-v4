@@ -1,4 +1,3 @@
-mod mango;
 mod services;
 mod coordinator;
 mod numerics;
@@ -29,7 +28,6 @@ use fixed::FixedI128;
 use fixed::types::extra::U48;
 use fixed::types::I80F48;
 use mango_v4::state::{PerpMarket, PerpMarketIndex, PlaceOrderType, QUOTE_DECIMALS, Side};
-use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 use crate::numerics::{native_amount, native_amount_to_lot, quote_amount_to_lot};
 use crate::services::blockhash::start_blockhash_service;
 use crate::services::perp_orders::{perp_bid_asset, perp_ask_asset, calc_perp_position_allowance};

@@ -122,8 +122,6 @@ impl PerpOrderbook {
     }
 }
 
-pub const MARKET_ETH_PERP: &str = "Fgh9JSZ2qfSjCw9RPJ85W2xbihsp2muLvfRztzoVR7f1";
-
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub struct PriceInfo {
     pub price: f64,

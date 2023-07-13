@@ -4,8 +4,8 @@ use anyhow::Context;
 use ordered_float::OrderedFloat;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 use crate::services::orderbook_stream::OrderstreamPrice;
+use crate::services::trading_config;
 
 #[derive(Debug, Copy, Clone)]
 pub struct SwapBuyPrice {
@@ -86,8 +86,8 @@ async fn call_exactin() -> anyhow::Result<Vec<SwapQueryResult>> {
     let quote = Client::new()
         .get("https://api.mngo.cloud/router/v1/swap")
         .query(&[
-            ("inputMint", MINT_ADDRESS_USDC.to_string()),
-            ("outputMint", MINT_ADDRESS_ETH.to_string()),
+            ("inputMint", trading_config::MINT_ADDRESS_INPUT.to_string()),
+            ("outputMint", trading_config::MINT_ADDRESS_OUTPUT.to_string()),
             ("amount", format!("{}", amount)),
             ("slippage", format!("{}", slippage)),
             ("feeBps", 0.to_string()),
@@ -130,8 +130,8 @@ async fn call_exactout() -> anyhow::Result<Vec<SwapQueryResult>> {
         reqwest::Client::new()
             .get("https://api.mngo.cloud/router/v1/swap")
             .query(&[
-                ("inputMint", MINT_ADDRESS_USDC.to_string()),
-                ("outputMint", MINT_ADDRESS_ETH.to_string()),
+                ("inputMint", trading_config::MINT_ADDRESS_INPUT.to_string()),
+                ("outputMint", trading_config::MINT_ADDRESS_OUTPUT.to_string()),
                 ("amount", format!("{}", amount)),
                 ("slippage", format!("{}", slippage)),
                 ("feeBps", 0.to_string()),

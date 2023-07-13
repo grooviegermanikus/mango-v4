@@ -7,4 +7,5 @@ pub mod fill_update_event;
 pub mod blockhash;
 pub mod swap_orders;
 pub mod transactions;
+pub mod trading_config;
 

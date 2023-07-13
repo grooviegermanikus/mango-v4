@@ -3,7 +3,6 @@ use chrono::Utc;
 use solana_sdk::pubkey::Pubkey;
 use mango_v4::state::{PerpMarket, PerpPosition, PlaceOrderType, SelfTradeBehavior, Side};
 use mango_v4_client::{JupiterSwapMode, MangoClient};
-use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 use crate::numerics::{ConversionConf, native_amount, native_amount2, native_amount_to_lot, quote_amount_to_lot};
 use std::future::Future;
 use std::iter::Filter;
@@ -25,8 +24,8 @@ use mango_v4_client::{
     keypair_from_cli, pubkey_from_cli, Client,
     TransactionBuilderConfig,
 };
-use crate::mango;
 use crate::services::fill_update_event::FillUpdateEvent;
+use crate::services::trading_config;
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -89,21 +88,23 @@ pub async fn block_fills_until_client_id(
 
 }
 
+// not used ATM
 pub async fn perp_bid_blocking_until_fill(mango_client: &Arc<MangoClient>, client_order_id: u64) {
-    let mut web_socket = init_ws_subscription(&mango::MARKET_ETH_PERP);
+    let mut web_socket = init_ws_subscription(&trading_config::MARKET);
 
-    perp_bid_asset(mango_client.clone(), client_order_id).await;
+    perp_bid_asset(mango_client.clone(), client_order_id, 0.001).await;
 
     block_fills_until_client_id(
-        &mut web_socket, mango::MARKET_ETH_PERP, client_order_id).await.unwrap();
+        &mut web_socket, trading_config::MARKET, client_order_id).await.unwrap();
 }
 
-pub async fn perp_bid_asset(mango_client: Arc<MangoClient>, client_order_id: u64) -> Signature {
 
-    let market_index = mango_client.context.perp_market_indexes_by_name.get("ETH-PERP").unwrap();
+
+pub async fn perp_bid_asset(mango_client: Arc<MangoClient>, client_order_id: u64, amount: f64) -> Signature {
+
+    let market_index = mango_client.context.perp_market_indexes_by_name.get(trading_config::PERP_MARKET_NAME).unwrap(); // TODO
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
 
-    let amount = 0.001;
     let order_size_lots = native_amount_to_lot(perp_market.into(), amount);
     debug!("perp order bid with size (client id {}): {}, {} lots", client_order_id, amount, order_size_lots);
 
@@ -169,13 +170,12 @@ pub async fn calc_perp_position_allowance(mango_client: Arc<MangoClient>) -> Per
 
 // PERP ask
 // only return sig, caller must check for progress/confirmation
-pub async fn perp_ask_asset(mango_client: Arc<MangoClient>) -> Signature {
+pub async fn perp_ask_asset(mango_client: Arc<MangoClient>, amount: f64) -> Signature {
     let client_order_id = Utc::now().timestamp_micros() as u64;
 
-    let market_index = mango_client.context.perp_market_indexes_by_name.get("ETH-PERP").unwrap();
+    let market_index = mango_client.context.perp_market_indexes_by_name.get(trading_config::PERP_MARKET_NAME).unwrap();
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
 
-    let amount = 0.001;
     let order_size_lots = native_amount_to_lot(perp_market.into(), amount);
     debug!("perp order ask with size (client id {}): {}, {} lots", client_order_id, amount, order_size_lots);
 
