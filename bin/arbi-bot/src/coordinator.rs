@@ -42,7 +42,7 @@ struct Coordinator {
     last_ask_price_shared: Arc<RwLock<Option<PriceInfo>>>,
 }
 
-pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
+pub async fn run_coordinator_service(mango_client: Arc<MangoClient>, dry_run: bool) {
 
     let (buy_price_xwrite, mut buy_price_xread) = unbounded_channel();
     let (sell_price_xwrite, mut sell_price_xread) = unbounded_channel();
@@ -124,7 +124,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                         if should_trade { "*" } else { "." },
                         perp_bid.price, swap_buy.price, 100.0 * profit);
 
-                    if should_trade {
+                    if should_trade && !dry_run {
                         info!("profitable trade swap2perp detected, starting trade sequence ...");
                         trade_sequence_swap2perp(mc.clone()).await;
                         throttle.tick().await;
@@ -164,7 +164,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                         if should_trade { "*" } else { "." },
                         swap_sell.price, perp_ask.price, 100.0 * profit);
 
-                    if should_trade {
+                    if should_trade && !dry_run {
                         info!("profitable trade perp2swap detected, starting trade sequence ...");
                         trade_sequence_perp2swap(mc.clone()).await;
                         throttle.tick().await;
@@ -188,11 +188,6 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 }
 
 async fn trade_sequence_swap2perp(mango_client: Arc<MangoClient>) {
-    if DRY_RUN {
-        warn!("skip trading (dry-run mode)");
-        return;
-    }
-    // TODO throttle
 
     // must be unique
 
@@ -216,10 +211,6 @@ async fn trade_sequence_swap2perp(mango_client: Arc<MangoClient>) {
 }
 
 async fn trade_sequence_perp2swap(mango_client: Arc<MangoClient>) {
-    if DRY_RUN {
-        warn!("skip trading (dry-run mode)");
-        return;
-    }
     // must be unique
     let client_order_id = Utc::now().timestamp_micros() as u64;
     info!("starting perp->swap trade sequence (client_order_id {}) ...", client_order_id);

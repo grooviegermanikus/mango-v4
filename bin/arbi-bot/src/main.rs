@@ -52,6 +52,9 @@ use websocket_tungstenite_retry::websocket_stable::StableWebSocket;
 #[clap()]
 struct Cli {
 
+    #[arg(short, long)]
+    dry_run: bool,
+
     // e.g. https://mango.devnet.rpcpool.com
     #[clap(short, long, env)]
     rpc_url: String,
@@ -64,8 +67,6 @@ struct Cli {
     #[clap(short, long, env)]
     owner: String,
 
-    // #[clap(subcommand)]
-    // command: Command,
 }
 
 
@@ -80,6 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let cli = Cli::parse_from(std::env::args_os());
 
+    let dry_run = cli.dry_run;
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss").replace("http", "ws");
 
@@ -88,7 +90,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
 
-    info!("Starting arbi-bot to {} ...", rpc_url);
+    info!("Starting arbi-bot{} to {} ...", if dry_run { "(DRYRUN)" } else { "" }, rpc_url);
 
     let mango_client = Arc::new(
         MangoClient::new_for_existing_account(
@@ -107,7 +109,7 @@ async fn main() -> Result<(), anyhow::Error> {
         ).await?);
 
 
-    let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
+    let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone(), dry_run));
     coordinator_thread.await?;
 
     Ok(())
