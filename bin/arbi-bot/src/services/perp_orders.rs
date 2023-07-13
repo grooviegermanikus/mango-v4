@@ -137,7 +137,7 @@ pub async fn calc_perp_position_allowance(mango_client: Arc<MangoClient>) -> Per
     // reload
     mango_client.account_fetcher.clear_cache().await;
 
-    let market_index = mango_client.context.perp_market_indexes_by_name.get("ETH-PERP").unwrap();
+    let market_index = mango_client.context.perp_market_indexes_by_name.get("ZZZZ-PERP").unwrap();
     let perp_market = mango_client.context.perp_markets.get(market_index).unwrap().market.clone();
     let mango_account = mango_client.mango_account().await.unwrap();
 

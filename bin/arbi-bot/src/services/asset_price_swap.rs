@@ -188,11 +188,4 @@ mod test {
 
     }
 
-    #[tokio::test]
-    async fn test_call_buy_usd() {
-        let usd = call_buy().await;
-        // 0.00053364
-        println!("USDETH: {:?}", usd);
-    }
-
 }

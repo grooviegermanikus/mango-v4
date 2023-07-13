@@ -17,15 +17,15 @@ use crate::services::trading_config::TOKEN_NAME;
 const SLIPPAGE: u64 = 5;
 
 pub async fn swap_sell_asset(mango_client: Arc<MangoClient>, amount: f64) -> anyhow::Result<Signature> {
-    let market_index = mango_client.context.token_indexes_by_name.get("ETH (Portal)").unwrap();
+    let market_index = mango_client.context.token_indexes_by_name.get(trading_config::TOKEN_NAME).unwrap();
     let market = mango_client.context.tokens.get(market_index).unwrap();
 
     let order_size_sell = native_amount2(market.decimals as u32, amount);
 
     debug!("swap order sell with size {:?}", order_size_sell);
     let sig_sell = mango_client.jupiter_swap(
-        Pubkey::from_str(trading_config::MINT_ADDRESS_ETH).unwrap(),
-        Pubkey::from_str(trading_config::MINT_ADDRESS_USDC).unwrap(),
+        Pubkey::from_str(trading_config::MINT_ADDRESS_INPUT).unwrap(),
+        Pubkey::from_str(trading_config::MINT_ADDRESS_OUTPUT).unwrap(),
         order_size_sell,
         SLIPPAGE, // TODO 0.01%, 100=1% make configurable
         JupiterSwapMode::ExactIn
@@ -45,8 +45,8 @@ pub async fn swap_buy_asset(mango_client: Arc<MangoClient>, amount: f64) -> anyh
 
     debug!("swap order buy with size {:?}", order_size_buy);
     let sig_buy = mango_client.jupiter_swap(
-        Pubkey::from_str(trading_config::MINT_ADDRESS_USDC).unwrap(),
-        Pubkey::from_str(trading_config::MINT_ADDRESS_ETH).unwrap(),
+        Pubkey::from_str(trading_config::MINT_ADDRESS_INPUT).unwrap(),
+        Pubkey::from_str(trading_config::MINT_ADDRESS_OUTPUT).unwrap(),
         order_size_buy,
         SLIPPAGE, // TODO 0.1%, 100=1% make configurable
         JupiterSwapMode::ExactOut
