@@ -16,10 +16,11 @@ use tokio::time::{interval, sleep};
 use anchor_lang::solana_program::example_mocks::solana_sdk::signature::Signature;
 use mango_v4_client::MangoClient;
 
-use services::orderbook_stream_sell::listen_perp_market_feed;
+use services::orderbook_stream::listen_perp_market_feed;
 
 use crate::{mango, services};
 use crate::services::asset_price_swap::{SwapBuyPrice, SwapSellPrice};
+use crate::services::orderbook_stream::PriceInfo;
 use crate::services::perp_orders::{calc_perp_position_allowance, perp_ask_asset, perp_bid_asset, perp_bid_blocking_until_fill, PerpAllowance};
 use crate::services::swap_orders::{swap_buy_asset, swap_sell_asset};
 
@@ -37,8 +38,8 @@ struct Coordinator {
     buy_price_stream: UnboundedReceiver<SwapBuyPrice>,
     sell_price_stream: UnboundedReceiver<SwapSellPrice>,
     // orderbook
-    last_bid_price_shared: Arc<RwLock<Option<f64>>>,
-    last_ask_price_shared: Arc<RwLock<Option<f64>>>,
+    last_bid_price_shared: Arc<RwLock<Option<PriceInfo>>>,
+    last_ask_price_shared: Arc<RwLock<Option<PriceInfo>>>,
 }
 
 pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
@@ -117,11 +118,11 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                 debug!("orderbook(perp) best bid {:?}", *orderbook_bid);
 
                 if let (Some(perp_bid), Some(swap_buy)) = (*orderbook_bid, latest_swap_buy) {
-                    let profit = (perp_bid - swap_buy.price) / swap_buy.price;
+                    let profit = (perp_bid.price - swap_buy.price) / swap_buy.price;
                     let should_trade = should_trade(profit);
                     info!("{} perp-bid {:.2?} vs swap-buy {:.2?}, expected profit {:.2?}%",
-                        if should_trade { "*" } else { "." }
-                        perp_bid, swap_buy.price, 100.0 * profit);
+                        if should_trade { "*" } else { "." },
+                        perp_bid.price, swap_buy.price, 100.0 * profit);
 
                     if should_trade {
                         info!("profitable trade swap2perp detected, starting trade sequence ...");
@@ -158,11 +159,11 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                 debug!("swap latest sell price {:?}", latest_swap_sell);
 
                 if let (Some(perp_ask), Some(swap_sell)) = (*orderbook_ask, latest_swap_sell) {
-                    let profit = (swap_sell.price - perp_ask) / perp_ask;
+                    let profit = (swap_sell.price - perp_ask.price) / perp_ask.price;
                     let should_trade = should_trade(profit);
                     info!("{} swap-sell {:.2?} vs perp-ask {:.2?}, expected profit {:.2?}%",
                         if should_trade { "*" } else { "." },
-                        swap_sell.price, perp_ask, 100.0 * profit);
+                        swap_sell.price, perp_ask.price, 100.0 * profit);
 
                     if should_trade {
                         info!("profitable trade perp2swap detected, starting trade sequence ...");

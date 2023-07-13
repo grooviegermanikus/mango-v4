@@ -124,12 +124,16 @@ impl PerpOrderbook {
 
 pub const MARKET_ETH_PERP: &str = "Fgh9JSZ2qfSjCw9RPJ85W2xbihsp2muLvfRztzoVR7f1";
 
-
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct PriceInfo {
+    pub price: f64,
+    pub write_version: u64,
+}
 
 // requires running "service-mango-orderbook" - see README
 pub async fn listen_perp_market_feed(market_id: &str,
-                                     highest_bid_price: Arc<RwLock<Option<f64>>>,
-                                     lowest_ask_price: Arc<RwLock<Option<f64>>>) {
+                                     highest_bid_price: Arc<RwLock<Option<PriceInfo>>>,
+                                     lowest_ask_price: Arc<RwLock<Option<PriceInfo>>>) {
 
     let mut orderbook: PerpOrderbook = PerpOrderbook::default();
 
@@ -164,7 +168,10 @@ subscription_request).await.unwrap();
                 };
                 orderbook.update_bid_price(price.price, price.quantity);
                 let mut lock = highest_bid_price.write().await;
-                *lock = orderbook.get_highest_bid_price();
+                *lock = orderbook.get_highest_bid_price().map(|price| PriceInfo {
+                    price: price,
+                    write_version: checkpoint.write_version,
+                });
             }
 
             for ask in checkpoint.asks {
@@ -176,7 +183,10 @@ subscription_request).await.unwrap();
                 };
                 orderbook.update_ask_price(price.price, price.quantity);
                 let mut lock = lowest_ask_price.write().await;
-                *lock = orderbook.get_lowest_ask_price();
+                *lock = orderbook.get_lowest_ask_price().map(|price| PriceInfo {
+                    price: price,
+                    write_version: checkpoint.write_version,
+                });
             }
         }
 
@@ -193,12 +203,18 @@ subscription_request).await.unwrap();
                 if update.side == OrderbookSide::Bid {
                     orderbook.update_bid_price(price.price, price.quantity);
                     let mut lock = highest_bid_price.write().await;
-                    *lock = Some(price.price);
+                    *lock = Some(PriceInfo {
+                        price: price.price,
+                        write_version: update.write_version,
+                    });
                 }
                 if update.side == OrderbookSide::Ask {
                     orderbook.update_ask_price(price.price, price.quantity);
                     let mut lock = lowest_ask_price.write().await;
-                    *lock = Some(price.price);
+                    *lock = Some(PriceInfo {
+                        price: price.price,
+                        write_version: update.write_version,
+                    });
                 }
 
                 // TODO remove
