@@ -168,6 +168,13 @@ subscription_request).await.unwrap();
                 };
                 orderbook.update_bid_price(price.price, price.quantity);
                 let mut lock = highest_bid_price.write().await;
+                if let Some(old_highest) = *lock {
+                    if old_highest.write_version > checkpoint.write_version {
+                        // TODO reduce log level
+                        warn!("skip orderbook update due to old timestamp");
+                        continue;
+                    }
+                }
                 *lock = orderbook.get_highest_bid_price().map(|price| PriceInfo {
                     price: price,
                     write_version: checkpoint.write_version,
@@ -183,6 +190,13 @@ subscription_request).await.unwrap();
                 };
                 orderbook.update_ask_price(price.price, price.quantity);
                 let mut lock = lowest_ask_price.write().await;
+                if let Some(old_highest) = *lock {
+                    if old_highest.write_version > checkpoint.write_version {
+                        // TODO reduce log level
+                        warn!("skip orderbook update due to old timestamp");
+                        continue;
+                    }
+                }
                 *lock = orderbook.get_lowest_ask_price().map(|price| PriceInfo {
                     price: price,
                     write_version: checkpoint.write_version,
@@ -203,6 +217,13 @@ subscription_request).await.unwrap();
                 if update.side == OrderbookSide::Bid {
                     orderbook.update_bid_price(price.price, price.quantity);
                     let mut lock = highest_bid_price.write().await;
+                    if let Some(old_highest) = *lock {
+                        if old_highest.write_version > update.write_version {
+                            // TODO reduce log level
+                            warn!("skip orderbook update due to old timestamp");
+                            continue;
+                        }
+                    }
                     *lock = Some(PriceInfo {
                         price: price.price,
                         write_version: update.write_version,
@@ -211,6 +232,13 @@ subscription_request).await.unwrap();
                 if update.side == OrderbookSide::Ask {
                     orderbook.update_ask_price(price.price, price.quantity);
                     let mut lock = lowest_ask_price.write().await;
+                    if let Some(old_highest) = *lock {
+                        if old_highest.write_version > update.write_version {
+                            // TODO reduce log level
+                            warn!("skip orderbook update due to old timestamp");
+                            continue;
+                        }
+                    }
                     *lock = Some(PriceInfo {
                         price: price.price,
                         write_version: update.write_version,

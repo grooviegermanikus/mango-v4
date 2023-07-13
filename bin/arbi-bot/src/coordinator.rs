@@ -200,14 +200,19 @@ async fn trade_sequence_swap2perp(mango_client: Arc<MangoClient>) {
 
     info!("starting swap->perp trade sequence ...");
 
-    let async_buy = swap_buy_asset(mango_client.clone());
+    let swap_buy = swap_buy_asset(mango_client.clone()).await;
     // TODO check for confirmed state (ask max)
+
+    if let Err(err) = swap_buy {
+        info!("Swap buy failed, aborting trade sequence: {}", err);
+        return;
+    }
 
     let async_ask = perp_ask_asset(mango_client.clone());
 
-    let (sig_buy, sig_ask) = join!(async_buy, async_ask);
+    let (sig_ask) = join!(async_ask);
 
-    info!("dispatched trading pair with signatures {} and {}", sig_buy, sig_ask);
+    info!("dispatched trading pair with signatures {} and {:?}", swap_buy.unwrap(), sig_ask);
 
     info!("trade sequence completed.");
 }
@@ -224,11 +229,16 @@ async fn trade_sequence_perp2swap(mango_client: Arc<MangoClient>) {
     let async_bid = perp_bid_asset(mango_client.clone(), client_order_id);
     // TODO check for confirmed state (ask max)
 
-    let async_sell = swap_sell_asset(mango_client.clone());
+    let swap_sell = swap_sell_asset(mango_client.clone()).await;
 
-    let (sig_bid, sig_sell) = join!(async_bid, async_sell);
+    if let Err(err) = swap_sell {
+        info!("Swap sell failed, aborting trade sequence (!!! perp positions will remain open): {}", err);
+        return;
+    }
 
-    info!("dispatched trading pair with signatures {} and {}", sig_bid, sig_sell);
+    let (sig_bid) = join!(async_bid);
+
+    info!("dispatched trading pair with signatures {:?} and {}", sig_bid, swap_sell.unwrap());
 
     info!("trade sequence completed.");
 }
