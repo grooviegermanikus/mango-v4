@@ -32,7 +32,7 @@ use mango_v4::state::{PerpMarket, PerpMarketIndex, PlaceOrderType, QUOTE_DECIMAL
 use crate::mango::{MINT_ADDRESS_ETH, MINT_ADDRESS_USDC};
 use crate::numerics::{native_amount, native_amount_to_lot, quote_amount_to_lot};
 use crate::services::blockhash::start_blockhash_service;
-use crate::services::perp_orders::{perp_bid_asset, perp_ask_asset};
+use crate::services::perp_orders::{perp_bid_asset, perp_ask_asset, calc_perp_position_allowance};
 use crate::services::swap_orders::swap_buy_asset;
 use crate::services::transactions;
 
@@ -42,6 +42,7 @@ use log::info;
 use serde_json::json;
 use solana_client::nonblocking::pubsub_client::PubsubClient;
 use solana_client::nonblocking::rpc_client::RpcClient;
+use tokio::time::Interval;
 use url::Url;
 use websocket_tungstenite_retry::websocket_stable::StableWebSocket;
 // use jsonrpc_core_client::transports::ws;

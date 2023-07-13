@@ -127,7 +127,6 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                     if should_trade {
                         info!("profitable trade swap2perp detected, starting trade sequence ...");
                         trade_sequence_swap2perp(mc.clone()).await;
-                        post_trade(mc.clone());
                         throttle.tick().await;
                     }
                 }
@@ -168,7 +167,6 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
                     if should_trade {
                         info!("profitable trade perp2swap detected, starting trade sequence ...");
                         trade_sequence_perp2swap(mc.clone()).await;
-                        post_trade(mc.clone());
                         throttle.tick().await;
                     }
                 }
@@ -268,8 +266,3 @@ fn should_trade(profit: f64) -> bool {
     profit > 0.002 // 0.2%
 }
 
-async fn post_trade(mango_client: Arc<MangoClient>) {
-    info!("post-trade cleanup ...");
-    // clear cache - data will be reloaded by .mango_account() call
-    mango_client.account_fetcher.clear_cache().await;
-}
