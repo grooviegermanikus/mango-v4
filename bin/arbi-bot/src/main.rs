@@ -14,7 +14,6 @@ use std::thread;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use chrono::Utc;
-use futures::future::join_all;
 use futures::TryFutureExt;
 use jsonrpc_core_client::transports::ws;
 use jsonrpc_core_client::TypedSubscriptionStream;
@@ -24,6 +23,7 @@ use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::signer::keypair;
 use anchor_client::Cluster;
+use env_logger::Env;
 use solana_sdk::signature::Signer;
 use fixed::FixedI128;
 use fixed::types::extra::U48;
@@ -39,8 +39,11 @@ use crate::services::transactions;
 use solana_client::rpc_response::SlotUpdate;
 use jsonrpc_core::futures::StreamExt;
 use log::info;
+use serde_json::json;
 use solana_client::nonblocking::pubsub_client::PubsubClient;
 use solana_client::nonblocking::rpc_client::RpcClient;
+use url::Url;
+use websocket_tungstenite_retry::websocket_stable::StableWebSocket;
 // use jsonrpc_core_client::transports::ws;
 // use jsonrpc_core_client::TypedSubscriptionStream;
 
@@ -70,7 +73,7 @@ struct Cli {
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV,
-                 "info,arbi_bot=trace"),
+                                             "info,arbi_bot=trace,websocket_tungstenite_retry::websocket_stable=trace"),
     );
 
 
@@ -83,6 +86,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let owner: Arc<Keypair> = Arc::new(keypair_from_cli(cli.owner.as_str()));
 
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
+
+    info!("Starting arbi-bot to {} ...", rpc_url);
 
     let mango_client = Arc::new(
         MangoClient::new_for_existing_account(
@@ -100,7 +105,6 @@ async fn main() -> Result<(), anyhow::Error> {
             owner.clone(),
         ).await?);
 
-    info!("Starting arbi-bot to {} ...", rpc_url);
 
     let coordinator_thread = tokio::spawn(coordinator::run_coordinator_service(mango_client.clone()));
     coordinator_thread.await?;

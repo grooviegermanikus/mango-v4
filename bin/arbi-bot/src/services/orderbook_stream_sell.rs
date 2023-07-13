@@ -3,7 +3,7 @@ use std::future::Future;
 use std::net::TcpStream;
 use std::pin::Pin;
 use std::sync::{Arc, Condvar};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use anyhow::anyhow;
 
 use log::{debug, error, info, trace, warn};
@@ -12,13 +12,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Value};
 use tokio::io;
 use tokio::sync::{Mutex, RwLock};
-use stream_reconnect::{UnderlyingStream, ReconnectStream};
 use tokio_tungstenite::{connect_async, tungstenite, WebSocketStream};
 use tokio_tungstenite::tungstenite::{connect, Message, WebSocket, error::Error as WsError};
 use tokio_tungstenite::tungstenite::client::connect_with_config;
 use tokio_tungstenite::tungstenite::http::Response;
+use tokio_tungstenite::tungstenite::Message::Text;
 use tokio_tungstenite::tungstenite::stream::MaybeTlsStream;
 use url::Url;
+use websocket_tungstenite_retry::websocket_stable::{StableWebSocket, WsMessage};
 use crate::services::fill_update_event::FillUpdateEvent;
 
 #[derive(Debug, Copy, Clone)]
@@ -121,68 +122,30 @@ impl PerpOrderbook {
     }
 }
 
+pub const MARKET_ETH_PERP: &str = "Fgh9JSZ2qfSjCw9RPJ85W2xbihsp2muLvfRztzoVR7f1";
+
+
 
 // requires running "service-mango-orderbook" - see README
 pub async fn listen_perp_market_feed(market_id: &str,
                                      highest_bid_price: Arc<RwLock<Option<f64>>>,
                                      lowest_ask_price: Arc<RwLock<Option<f64>>>) {
 
-
-    // let mut foo = connect(Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap()).expect("Can't connect");
-    // foo.0.read_message();
-    //
-    // let socket : ReconnectWs
-    // = ReconnectWs::connect("wss://api.mngo.cloud/orderbook/v1/".to_string()).await.unwrap();
-    // socket.0.0.read_message();
-
-    let (mut socket, response) =
-        connect(Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap()).expect("Can't connect");
-    //     ReconnectWs::connect("wss://api.mngo.cloud/orderbook/v1/".to_string());
-    //
-    if response.status() != 101 {
-        // TODO implement reconnects
-        panic!("Error connecting to the server: {:?}", response);
-    }
-
-    // Response { status: 101, version: HTTP/1.1, headers: {"connection": "Upgrade", "upgrade": "websocket", "sec-websocket-accept": "ppgfXDDxtQBmL0eczLMf5VGbFIo="}, body: () }
-
-    // subscriptions= {"command":"subscribe","marketId":"ESdnpnNLgTkBCZRuTJkZLi5wKEZ2z47SG3PJrhundSQ2"}
-    let sub = &WsSubscriptionOrderbook {
-        command: "subscribe".to_string(),
-        market_id: market_id.to_string(),
-    };
-    // Ok(Text("{\"success\":false,\"message\":\"market not found\"}"))
-    // Ok(Text("{\"success\":true,\"message\":\"subscribed\"}"))
-
-    socket.write_message(Message::text(json!(sub).to_string())).unwrap();
-
     let mut orderbook: PerpOrderbook = PerpOrderbook::default();
 
-    loop {
-        match socket.read_message() {
-            Ok(msg) => {
-                trace!("Received: {}", msg);
-            }
-            Err(e) => {
-                match e {
-                    tungstenite::Error::ConnectionClosed => {
-                        error!("Connection closed");
-                        break;
-                    }
-                    _ => {}
-                }
-                error!("Error reading message: {:?}", e);
-                break;
-            }
-        }
-        let msg = socket.read_message().unwrap();
+    let subscription_request = json!({
+            "command": "subscribe",
+            "marketId": market_id.to_string(),
+        });
 
-        let msg = match msg {
-            tungstenite::Message::Text(s) => { s }
-            _ => continue
-        };
+    let mut socket = StableWebSocket::new(
+        Url::parse("wss://api.mngo.cloud/orderbook/v1/").unwrap(),
+subscription_request).await.unwrap();
 
-        let plain = from_str::<Value>(&msg).expect("Can't parse to JSON");
+    while let Some(ws_message) = socket.get_message_channel().recv().await {
+        let WsMessage::Text(plain) = ws_message else { continue; };
+
+        let plain = from_str::<Value>(&plain).expect("Can't parse to JSON");
 
         // detect checkpoint messages via property bid+ask
         let is_checkpoint_message = plain.get("bids").is_some() && plain.get("asks").is_some();
@@ -218,7 +181,7 @@ pub async fn listen_perp_market_feed(market_id: &str,
         }
 
         if is_update_message {
-            let update: OrderbookUpdate = serde_json::from_value(plain.clone()).expect(format!("Can't convert json <{}>", msg).as_str());
+            let update: OrderbookUpdate = serde_json::from_value(plain.clone()).expect(format!("Can't convert json <{}>", plain).as_str());
 
             debug!("update({:?}): {:?}", update.slot, update.update);
             for data in update.update {
@@ -247,49 +210,6 @@ pub async fn listen_perp_market_feed(market_id: &str,
 
     }
 
-
+    socket.join().await;
 }
 
-type ReconnectWs = ReconnectStream<MyWs, String, Result<Message, WsError>, WsError>;
-
-
-// https://docs.rs/stream-reconnect/0.3.4/stream_reconnect/
-struct MyWs((WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, tungstenite::handshake::client::Response));
-
-impl UnderlyingStream<String, Result<Message, WsError>, WsError> for MyWs {
-    // Establishes connection.
-    // Additionally, this will be used when reconnect tries are attempted.
-    fn establish(addr: String) -> Pin<Box<dyn Future<Output = Result<Self, WsError>> + Send>> {
-        Box::pin(async move {
-            // In this case, we are trying to connect to the WebSocket endpoint
-            let (ws_connection, response) = connect_async(addr).await.unwrap();
-            Ok(MyWs((ws_connection, response)))
-        })
-    }
-
-    // The following errors are considered disconnect errors.
-    fn is_write_disconnect_error(&self, err: &WsError) -> bool {
-        matches!(
-                err,
-                WsError::ConnectionClosed
-                    | WsError::AlreadyClosed
-                    | WsError::Io(_)
-                    | WsError::Tls(_)
-                    | WsError::Protocol(_)
-            )
-    }
-
-    // If an `Err` is read, then there might be an disconnection.
-    fn is_read_disconnect_error(&self, item: &Result<Message, WsError>) -> bool {
-        if let Err(e) = item {
-            self.is_write_disconnect_error(e)
-        } else {
-            false
-        }
-    }
-
-    // Return "Exhausted" if all retry attempts are failed.
-    fn exhaust_err() -> WsError {
-        WsError::Io(io::Error::new(io::ErrorKind::Other, "Exhausted"))
-    }
-}

@@ -16,27 +16,30 @@ anchor-spl = { workspace = true }
 anyhow = "1.0"
 clap = { version = "3.1.8", features = ["derive", "env"] }
 dotenv = "0.15.0"
-env_logger = "0.8.4"
 fixed = { workspace = true, features = ["serde", "borsh"] }
 futures = "0.3.21"
-log = "0.4.0"
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
 pyth-sdk-solana = "0.1.0"
-serum_dex = { workspace = true, default-features=false,features = ["no-entrypoint", "program"] }
+serum_dex = { workspace = true, default-features=false, features = ["no-entrypoint", "program"] }
 solana-client = { workspace = true }
 solana-sdk = { workspace = true }
 jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
 
+log = "0.4.0"
+env_logger = "0.8.4"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
 
 tokio = { version = "1.14.1", features = ["rt-multi-thread", "time", "macros", "sync"] }
+tokio-tungstenite = { version = "0.17.2", features = ["native-tls"] }
 serde = { version = "1.0.122", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4.24", features = ["serde"] }
 
-tokio-tungstenite = { version = "0.17.2", features = ["native-tls"] }
-stream-reconnect = "0.3.4"
+#stream-reconnect = "0.3.4"
+websocket-tungstenite-retry = { git = "https://github.com/grooviegermanikus/websocket-tungstenite-retry.git", tag = "v0.5.2" }
 
 itertools = "0.10.5"
 ordered-float = "3.7.0"

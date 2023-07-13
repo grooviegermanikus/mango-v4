@@ -90,6 +90,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
         async move {
             sleep(STARTUP_DELAY).await;
             listen_perp_market_feed(mango::MARKET_ETH_PERP, last_bid_price, last_ask_price).await;
+            warn!("Orderbook WebSocket stream thread exited!");
         }
     });
 
@@ -176,7 +177,7 @@ pub async fn run_coordinator_service(mango_client: Arc<MangoClient>) {
 
     // mango_client.mango_account().await.unwrap().
 
-    join!(poll_buy_price, poll_sell_price, poll_orderbook);
+    tokio::join!(poll_buy_price, poll_sell_price, poll_orderbook);
 
 }
 
