@@ -39,7 +39,7 @@ serde_json = "1.0"
 chrono = { version = "0.4.24", features = ["serde"] }
 
 #stream-reconnect = "0.3.4"
-websocket-tungstenite-retry = { git = "https://github.com/grooviegermanikus/websocket-tungstenite-retry.git", tag = "v0.5.2" }
+websocket-tungstenite-retry = { git = "https://github.com/grooviegermanikus/websocket-tungstenite-retry.git", tag = "v0.6.0" }
 
 itertools = "0.10.5"
 ordered-float = "3.7.0"
