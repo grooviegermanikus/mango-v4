@@ -20,7 +20,7 @@ use crate::services::asset_price_swap::{SwapBuyPrice, SwapSellPrice};
 use crate::services::orderbook_stream::{listen_perp_market_feed, PriceInfo};
 use crate::services::perp_orders::{calc_perp_position_allowance, perp_ask_asset, perp_bid_asset, perp_bid_blocking_until_fill, PerpAllowance};
 use crate::services::swap_orders::{swap_buy_asset, swap_sell_asset};
-use crate::services::trading_config::{BASE_QTY_UI, MARKET};
+use crate::services::trading_config::*;
 
 const DRY_RUN: bool = true;
 
@@ -253,6 +253,6 @@ fn drain_swap_sell_feed(feed: &mut UnboundedReceiver<SwapSellPrice>) -> Option<S
 
 fn should_trade(profit: f64) -> bool {
     // 1 bps = 0.0001 = 0.01%
-    profit > 0.002 // 0.2%
+    profit > PROFIT_THRESHOLD // 0.2%
 }
 

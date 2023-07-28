@@ -8,6 +8,8 @@ const MINT_ADDRESS_SOL: &str = "So11111111111111111111111111111111111111112";
 
 
 // ETH
+// 1 bps = 0.0001 = 0.01%
+pub const PROFIT_THRESHOLD: f64 = 0.005; // 50 bps
 pub const BASE_QTY_UI: f64 = 0.001;
 pub const PERP_ALLOWANCE_THRESHOLD_BASE_UI: f64 = 0.02;
 pub const BASE_DECIMALS: u8 = 8;
@@ -18,6 +20,8 @@ pub const MINT_ADDRESS_INPUT: &str = MINT_ADDRESS_USDC;
 pub const MINT_ADDRESS_OUTPUT: &str = MINT_ADDRESS_ETH;
 
 // SOL
+// 1 bps = 0.0001 = 0.01%
+// pub const PROFIT_THRESHOLD: f64 = 0.002; // 20 bps
 // pub const BASE_QTY_UI: f64 = 0.1; // 2 USD
 // pub const PERP_ALLOWANCE_THRESHOLD_BASE_UI: f64 = 1.1;
 // pub const BASE_DECIMALS: u8 = 9;
