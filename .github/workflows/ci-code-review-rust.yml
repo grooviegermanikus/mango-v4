@@ -103,7 +103,7 @@ jobs:
         run: |
           rustup toolchain list
           cargo build-sbf --features enable-gpl || true
-          cargo +sbf build-sbf --features enable-gpl
+          cargo +solana build-sbf --features enable-gpl
 
         # Run bpf tests and output to runner and log
       - name: Run bpf tests
