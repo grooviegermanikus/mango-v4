@@ -99,6 +99,7 @@ jobs:
 
       - name: Build all deps
         run: |
+          rustup toolchain list
           cargo build-sbf --features enable-gpl || true
           cargo +sbf build-sbf --features enable-gpl
 
