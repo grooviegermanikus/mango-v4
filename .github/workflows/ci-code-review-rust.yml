@@ -1,6 +1,8 @@
 name: Code Review - Rust
 on:
   push:
+    branches:
+      - 'fix-ci-toolchain-bpf'
     paths:
       [
         'bin/cli/**',
