@@ -4513,6 +4513,53 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
+name = "play-with-account-fetcher"
+version = "0.0.1"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anyhow",
+ "arrayref",
+ "async-channel",
+ "async-once-cell",
+ "async-stream 0.2.1",
+ "async-trait",
+ "atty",
+ "bs58 0.3.1",
+ "bytemuck",
+ "bytes 1.5.0",
+ "chrono",
+ "clap 3.2.25",
+ "dotenv",
+ "futures 0.3.28",
+ "futures-core",
+ "futures-util",
+ "itertools",
+ "jemallocator",
+ "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-core-client",
+ "mango-v4",
+ "once_cell",
+ "pyth-sdk-solana",
+ "rand 0.7.3",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
+ "shellexpand",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-logger",
+ "solana-rpc",
+ "solana-sdk",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite 0.16.1",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "polyval"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
