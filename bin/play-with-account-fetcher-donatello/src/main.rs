@@ -1,9 +1,11 @@
 mod account_fetcher_donatello;
+mod account_fetcher_mangov4;
+mod account_fetcher_trait;
 
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{info, trace};
-use crate::account_fetcher_donatello::{account_fetcher_fetch_mango_account, CachedAccountFetcher, RpcAccountFetcher};
+use account_fetcher_mangov4::{account_fetcher_fetch_mango_account, CachedAccountFetcher, RpcAccountFetcher};
 use solana_client::nonblocking::rpc_client::{RpcClient as RpcClientAsync, RpcClient};
 use solana_sdk::pubkey::Pubkey;
 use mango_v4::state::{MangoAccountValue, PerpMarket};
@@ -39,7 +41,7 @@ pub async fn load_mango_account(
         rpc,
     })));
     let mango_account: MangoAccountValue =
-        account_fetcher_donatello::account_fetcher_fetch_mango_account(&*account_fetcher, &account).await.unwrap();
+        account_fetcher_mangov4::account_fetcher_fetch_mango_account(&*account_fetcher, &account).await.unwrap();
     // info!("mango account: {:?}", mango_account);
     info!("mango account loaded");
 }
@@ -52,7 +54,7 @@ pub async fn load_anchor_account(
         rpc,
     })));
     let perp_market: PerpMarket =
-        account_fetcher_donatello::account_fetcher_fetch_anchor_account::<PerpMarket>(&*account_fetcher, &account).await.unwrap();
+        account_fetcher_mangov4::account_fetcher_fetch_anchor_account::<PerpMarket>(&*account_fetcher, &account).await.unwrap();
     info!("perp account loaded: base_decimals={}", perp_market.base_decimals);
 }
 

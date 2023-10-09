@@ -15,6 +15,7 @@ use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
+use crate::{account_fetcher_donatello, account_fetcher_trait};
 
 pub struct AccountFetcher {
     pub chain_data: Arc<RwLock<ChainData>>,
@@ -156,7 +157,8 @@ impl AccountFetcher {
 }
 
 #[async_trait::async_trait]
-impl mango_v4_client::AccountFetcher for AccountFetcher {
+// mango_v4_client::AccountFetcher
+impl account_fetcher_trait::AccountFetcher for AccountFetcher {
     async fn fetch_raw_account(
         &self,
         address: &Pubkey,
