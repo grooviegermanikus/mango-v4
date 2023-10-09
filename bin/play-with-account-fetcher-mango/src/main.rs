@@ -1,4 +1,3 @@
-mod account_fetcher_donatello;
 mod account_fetcher_mangov4;
 mod account_fetcher_trait;
 
