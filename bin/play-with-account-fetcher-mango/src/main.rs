@@ -22,35 +22,53 @@ async fn main() {
     let perp_account_pk: Pubkey = Pubkey::from_str("ESdnpnNLgTkBCZRuTJkZLi5wKEZ2z47SG3PJrhundSQ2").unwrap();
 
 
-    let client = RpcClientAsync::new(rpc_url);
 
-    // load_mango_account(client, mango_account_pk).await;
+    load_mango_account_cached(rpc_url.clone(), mango_account_pk).await;
+
+    load_mango_account(rpc_url.clone(), mango_account_pk).await;
+
+    load_anchor_account(rpc_url.clone(), perp_account_pk).await;
+
+}
 
 
-    load_anchor_account(client, perp_account_pk).await;
+pub async fn load_mango_account_cached(
+    rpc_url: String,
+    account: Pubkey,
+) {
+    let rpc_client = RpcClientAsync::new(rpc_url);
 
+    let cachedaccount_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
+        rpc: rpc_client,
+    })));
+    let _mango_account: MangoAccountValue =
+        account_fetcher_mangov4::account_fetcher_fetch_mango_account(&*cachedaccount_fetcher, &account).await.unwrap();
+    info!("mango account loaded cached");
 }
 
 
 pub async fn load_mango_account(
-    rpc: RpcClient,
+    rpc_url: String,
     account: Pubkey,
 ) {
-    let account_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
-        rpc,
-    })));
-    let mango_account: MangoAccountValue =
+    let rpc_client = RpcClientAsync::new(rpc_url);
+
+    let account_fetcher = Arc::new(RpcAccountFetcher {
+        rpc: rpc_client,
+    });
+    let _mango_account: MangoAccountValue =
         account_fetcher_mangov4::account_fetcher_fetch_mango_account(&*account_fetcher, &account).await.unwrap();
-    // info!("mango account: {:?}", mango_account);
     info!("mango account loaded");
 }
 
 pub async fn load_anchor_account(
-    rpc: RpcClient,
+    rpc_url: String,
     account: Pubkey,
 ) {
+    let rpc_client = RpcClientAsync::new(rpc_url);
+
     let account_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
-        rpc,
+        rpc: rpc_client,
     })));
     let perp_market: PerpMarket =
         account_fetcher_mangov4::account_fetcher_fetch_anchor_account::<PerpMarket>(&*account_fetcher, &account).await.unwrap();
