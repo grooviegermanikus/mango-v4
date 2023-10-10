@@ -13,6 +13,8 @@ anchor-client = { workspace = true }
 
 mango-feeds-connector = "0.2.0"
 
+fixed = { workspace = true, features = ["serde", "borsh"] }
+
 anyhow = "1.0"
 arrayref = "0.3.6"
 async-channel = "1.6"

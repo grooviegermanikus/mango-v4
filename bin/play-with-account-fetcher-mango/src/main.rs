@@ -1,14 +1,17 @@
 mod account_fetcher_mangov4;
 mod account_fetcher_trait;
+mod mango_fetcher;
+mod chain_data_fetcher;
 
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
-use mockall::mock;
+use anchor_lang::Key;
+use mango_feeds_connector::chain_data;
 use tracing::{info, trace};
-use account_fetcher_mangov4::{account_fetcher_fetch_mango_account, CachedAccountFetcher, RpcAccountFetcher};
+use account_fetcher_mangov4::{CachedAccountFetcher, RpcAccountFetcher};
 use solana_client::nonblocking::rpc_client::{RpcClient as RpcClientAsync, RpcClient};
-use solana_sdk::account::AccountSharedData;
+use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::pubkey::Pubkey;
 use mango_v4::state::{MangoAccountValue, PerpMarket};
 use crate::account_fetcher_trait::AccountFetcher;
@@ -25,6 +28,10 @@ async fn main() {
     // https://app.mango.markets/dashboard
     // PERP-SOL
     let perp_account_pk: Pubkey = Pubkey::from_str("ESdnpnNLgTkBCZRuTJkZLi5wKEZ2z47SG3PJrhundSQ2").unwrap();
+    
+    chain_data_fetcher(rpc_url.clone()).await;
+
+    chain_data_fetcher_bank(rpc_url.clone()).await;
 
     load_mango_account_cached(rpc_url.clone(), mango_account_pk).await;
 
@@ -34,6 +41,39 @@ async fn main() {
 
     call_cache_with_mock(mango_account_pk).await;
 
+}
+
+async fn chain_data_fetcher(rpc_url: String) {
+    let rpc_client = RpcClientAsync::new(rpc_url);
+
+    let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
+    let account_fetcher = Arc::new(chain_data_fetcher::AccountFetcher {
+        chain_data: chain_data.clone(),
+        rpc: rpc_client,
+    });
+
+    let account_key = Pubkey::from_str("J6MsZiJUU6bjKSCkbfQsiHkd8gvJoddG2hsdSFsZQEZV").unwrap();
+    let price: anyhow::Result<AccountSharedData> = account_fetcher.fetch_raw_account(&account_key).await;
+    println!("price: {:?}", price);
+}
+
+
+async fn chain_data_fetcher_bank(rpc_url: String) {
+    let rpc_client = RpcClientAsync::new(rpc_url);
+
+    let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
+    let account_fetcher = Arc::new(chain_data_fetcher::AccountFetcher {
+        chain_data: chain_data.clone(),
+        rpc: rpc_client,
+    });
+    let bank = Pubkey::from_str("J6MsZiJUU6bjKSCkbfQsiHkd8gvJoddG2hsdSFsZQEZV").unwrap();
+
+    let current_slot = account_fetcher.refresh_account_via_rpc(&bank).await.unwrap();
+    info!("current_slot: {:?}", current_slot);
+
+    let account_data: AccountSharedData = account_fetcher.fetch_raw_account(&bank).await.unwrap();
+    info!("owner: {:?}", account_data.owner().key());
+    info!("lamports: {:?}", account_data.lamports());
 }
 
 struct MockExampleFetcher {
@@ -104,7 +144,7 @@ pub async fn load_mango_account_cached(
         rpc: rpc_client,
     })));
     let _mango_account: MangoAccountValue =
-        account_fetcher_mangov4::account_fetcher_fetch_mango_account(&*cachedaccount_fetcher, &account).await.unwrap();
+        mango_fetcher::account_fetcher_fetch_mango_account(&*cachedaccount_fetcher, &account).await.unwrap();
     info!("mango account loaded cached");
 }
 
@@ -119,7 +159,7 @@ pub async fn load_mango_account(
         rpc: rpc_client,
     });
     let _mango_account: MangoAccountValue =
-        account_fetcher_mangov4::account_fetcher_fetch_mango_account(&*account_fetcher, &account).await.unwrap();
+        mango_fetcher::account_fetcher_fetch_mango_account(&*account_fetcher, &account).await.unwrap();
     info!("mango account loaded");
 }
 
