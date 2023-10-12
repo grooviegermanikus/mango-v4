@@ -1,8 +1,17 @@
+//! Client utility to fetch Solana accounts via RPC with optional transparent caching.
+//!
+//! The retrieved account data will be deserialized using anchor types.
+//! No dependency to Mango Types are allowed; use `mango_account_fetcher.rs` instead.
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use solana_address_lookup_table_program::state::AddressLookupTable;
+
 use async_once_cell::unpin::Lazy;
+
+use futures::{stream, StreamExt, TryStreamExt};
 
 use anyhow::Context;
 
@@ -11,8 +20,8 @@ use anchor_lang::AccountDeserialize;
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
+use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::pubkey::Pubkey;
-
 use crate::account_fetcher_trait::AccountFetcher;
 
 // Can't be in the trait, since then it would no longer be object-safe...
@@ -88,7 +97,7 @@ impl<Key, Output> Default for CoalescedAsyncJob<Key, Output> {
     }
 }
 
-impl<Key: std::cmp::Eq + std::hash::Hash, Output: 'static> CoalescedAsyncJob<Key, Output> {
+impl<Key: Eq + std::hash::Hash, Output: 'static> CoalescedAsyncJob<Key, Output> {
     /// Either returns the job for `key` or registers a new job for it
     fn run_coalesced<F: std::future::Future<Output = Output> + Send + 'static>(
         &mut self,
@@ -113,7 +122,7 @@ struct AccountCache {
 
     account_jobs: CoalescedAsyncJob<Pubkey, anyhow::Result<AccountSharedData>>,
     program_accounts_jobs:
-        CoalescedAsyncJob<(Pubkey, [u8; 8]), anyhow::Result<Vec<(Pubkey, AccountSharedData)>>>,
+    CoalescedAsyncJob<(Pubkey, [u8; 8]), anyhow::Result<Vec<(Pubkey, AccountSharedData)>>>,
 }
 
 impl AccountCache {
@@ -235,4 +244,28 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
             )),
         }
     }
+}
+
+pub async fn fetch_address_lookup_table(
+    fetcher: &dyn AccountFetcher,
+    address: Pubkey,
+) -> anyhow::Result<AddressLookupTableAccount> {
+    let raw = fetcher
+        .fetch_raw_account_lookup_table(&address)
+        .await?;
+    let data = AddressLookupTable::deserialize(&raw.data())?;
+    Ok(AddressLookupTableAccount {
+        key: address,
+        addresses: data.addresses.to_vec(),
+    })
+}
+
+pub async fn fetch_address_lookup_tables(
+    fetcher: &dyn AccountFetcher,
+    alts: impl Iterator<Item = &Pubkey>,
+) -> anyhow::Result<Vec<AddressLookupTableAccount>> {
+    stream::iter(alts)
+        .then(|a| fetch_address_lookup_table(fetcher, *a))
+        .try_collect::<Vec<_>>()
+        .await
 }

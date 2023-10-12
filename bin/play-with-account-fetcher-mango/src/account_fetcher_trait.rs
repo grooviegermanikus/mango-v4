@@ -9,17 +9,17 @@ pub trait AccountFetcher: Sync + Send {
        address: &Pubkey,
     ) -> anyhow::Result<AccountSharedData>;
 
-    async fn fetch_program_accounts(
-        &self,
-        program: &Pubkey,
-        discriminator: [u8; 8],
-    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
-
     async fn fetch_raw_account_lookup_table(
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<AccountSharedData> {
         self.fetch_raw_account(address).await
     }
+
+    async fn fetch_program_accounts(
+        &self,
+        program: &Pubkey,
+        discriminator: [u8; 8],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
 
 }

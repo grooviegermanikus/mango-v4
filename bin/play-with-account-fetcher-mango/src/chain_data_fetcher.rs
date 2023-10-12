@@ -18,6 +18,7 @@ use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
+use crate::account_fetcher_trait::AccountFetcher;
 
 /// A complex account fetcher that mostly depends on an external job keeping
 /// the chain_data up to date.
@@ -26,12 +27,13 @@ use solana_sdk::signature::Signature;
 /// functions to access some kinds of data with less overhead.
 ///
 /// Also, there's functions for fetching up to date data via rpc.
-pub struct AccountFetcher {
+/// was renamed from "struct AccountFetcher" to avoid conflict with the trait
+pub struct ChainDataFetcher {
     pub chain_data: Arc<RwLock<ChainData>>,
     pub rpc: RpcClientAsync,
 }
 
-impl AccountFetcher {
+impl ChainDataFetcher {
     // loads from ChainData
     pub fn fetch<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
         &self,
@@ -172,7 +174,7 @@ impl AccountFetcher {
 }
 
 #[async_trait::async_trait]
-impl crate::AccountFetcher for AccountFetcher {
+impl AccountFetcher for ChainDataFetcher {
     async fn fetch_raw_account(
         &self,
         address: &Pubkey,

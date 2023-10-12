@@ -49,6 +49,7 @@ solana-client = { workspace = true }
 solana-logger = { workspace = true }
 solana-rpc = { workspace = true }
 solana-sdk = { workspace = true }
+solana-address-lookup-table-program = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.9"}
 tokio-tungstenite = "0.16.1"

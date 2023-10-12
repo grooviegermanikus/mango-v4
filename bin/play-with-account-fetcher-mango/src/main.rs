@@ -1,6 +1,6 @@
-mod account_fetcher_mangov4;
 mod account_fetcher_trait;
-mod mango_fetcher;
+mod account_fetcher_mangov4;
+mod mango_account_fetcher;
 mod chain_data_fetcher;
 
 use std::str::FromStr;
@@ -150,7 +150,7 @@ pub async fn load_mango_account_cached(
         rpc: rpc_client,
     })));
     let _mango_account: MangoAccountValue =
-        mango_fetcher::account_fetcher_fetch_mango_account(&*cachedaccount_fetcher, &account).await.unwrap();
+        mango_account_fetcher::account_fetcher_fetch_mango_account(&*cachedaccount_fetcher, &account).await.unwrap();
     info!("mango account loaded cached");
 }
 
@@ -165,7 +165,7 @@ pub async fn load_mango_account(
         rpc: rpc_client,
     });
     let _mango_account: MangoAccountValue =
-        mango_fetcher::account_fetcher_fetch_mango_account(&*account_fetcher, &account).await.unwrap();
+        mango_account_fetcher::account_fetcher_fetch_mango_account(&*account_fetcher, &account).await.unwrap();
     info!("mango account loaded");
 }
 
