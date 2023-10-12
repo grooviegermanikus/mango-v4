@@ -122,7 +122,7 @@ struct AccountCache {
 
     account_jobs: CoalescedAsyncJob<Pubkey, anyhow::Result<AccountSharedData>>,
     program_accounts_jobs:
-    CoalescedAsyncJob<(Pubkey, [u8; 8]), anyhow::Result<Vec<(Pubkey, AccountSharedData)>>>,
+        CoalescedAsyncJob<(Pubkey, [u8; 8]), anyhow::Result<Vec<(Pubkey, AccountSharedData)>>>,
 }
 
 impl AccountCache {

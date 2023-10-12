@@ -11,7 +11,7 @@ use solana_sdk::account::ReadableAccount;
 use solana_sdk::pubkey::Pubkey;
 
 use mango_v4::state::MangoAccountValue;
-use crate::account_fetcher_mangov4::fetch_address_lookup_table;
+use crate::account_fetcher::fetch_address_lookup_table;
 use crate::account_fetcher_trait::AccountFetcher;
 
 
@@ -26,6 +26,15 @@ pub async fn account_fetcher_fetch_mango_account(
         .with_context(|| format!("deserializing mango account {}", address))
 }
 
+/// Batch-lookup for ALTs
+///
+/// # Examples for use with mango-v4-client
+/// ```
+/// let context: MangoGroupContext = ...;
+///
+/// account_fetcher_mango_address_lookup_tables(
+///     &account_fetcher, context.address_lookup_table).await
+/// ```
 pub async fn account_fetcher_mango_address_lookup_tables(
     fetcher: &dyn AccountFetcher,
     address_lookup_table_pubkeys: Vec<Pubkey>,

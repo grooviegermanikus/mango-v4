@@ -1,5 +1,5 @@
 mod account_fetcher_trait;
-mod account_fetcher_mangov4;
+mod account_fetcher;
 mod mango_account_fetcher;
 mod chain_data_fetcher;
 
@@ -11,7 +11,7 @@ use chrono::{TimeZone, Utc};
 use futures_util::TryFutureExt;
 use mango_feeds_connector::chain_data;
 use tracing::{info, trace};
-use account_fetcher_mangov4::{CachedAccountFetcher, RpcAccountFetcher};
+use account_fetcher::{CachedAccountFetcher, RpcAccountFetcher};
 use solana_client::nonblocking::rpc_client::{RpcClient as RpcClientAsync, RpcClient};
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::clock;
@@ -179,7 +179,7 @@ pub async fn load_anchor_account(
         rpc: rpc_client,
     })));
     let perp_market: PerpMarket =
-        account_fetcher_mangov4::account_fetcher_fetch_anchor_account::<PerpMarket>(&*account_fetcher, &account).await.unwrap();
+        account_fetcher::account_fetcher_fetch_anchor_account::<PerpMarket>(&*account_fetcher, &account).await.unwrap();
     info!("perp account loaded: base_decimals={}", perp_market.base_decimals);
 }
 

@@ -2,8 +2,6 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
-// use crate::chain_data::*;
-
 use anchor_lang::Discriminator;
 
 use fixed::types::I80F48;
