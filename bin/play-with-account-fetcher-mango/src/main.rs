@@ -2,6 +2,7 @@ mod account_fetcher_trait;
 mod account_fetcher;
 mod mango_account_fetcher;
 mod chain_data_fetcher;
+mod mango_chain_data_fetcher;
 
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
