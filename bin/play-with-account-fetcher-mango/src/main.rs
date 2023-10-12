@@ -34,13 +34,6 @@ async fn main() {
     // PERP-SOL
     let perp_account_pk: Pubkey = Pubkey::from_str("ESdnpnNLgTkBCZRuTJkZLi5wKEZ2z47SG3PJrhundSQ2").unwrap();
 
-    {
-        let rpc_client = RpcClientAsync::new(rpc_url.clone());
-        let data = process_get_epoch_info(&rpc_client).await;
-        // println!("data: {:?}", data.);
-        // { epoch_info: EpochInfo { epoch: 516, slot_index: 235531, slots_in_epoch: 432000, absolute_slot: 223147531, block_height: 205264386, transaction_count: Some(232216463006) }, epoch_completed_percent: 54.521064814814814, average_slot_time_ms: 409, start_block_time: Some(1697002365), current_block_time: Some(1697099376) }
-    }
-
     chain_data_fetcher(rpc_url.clone()).await;
 
     chain_data_fetcher_bank(rpc_url.clone()).await;
@@ -70,6 +63,7 @@ async fn chain_data_fetcher(rpc_url: String) {
 }
 
 
+/// note: sometime the call is flakey
 async fn chain_data_fetcher_bank(rpc_url: String) {
     let rpc_client = RpcClientAsync::new(rpc_url);
 
@@ -222,72 +216,4 @@ pub struct CliEpochInfo {
     pub average_slot_time_ms: u64,
     pub start_block_time: Option<UnixTimestamp>,
     pub current_block_time: Option<UnixTimestamp>,
-}
-
-pub async fn process_get_epoch_info(rpc_client: &RpcClient) -> CliEpochInfo {
-
-
-    let epoch_info = rpc_client.get_epoch_info().await.unwrap();
-    let epoch_completed_percent =
-        epoch_info.slot_index as f64 / epoch_info.slots_in_epoch as f64 * 100_f64;
-    let mut cli_epoch_info = CliEpochInfo {
-        epoch_info,
-        epoch_completed_percent,
-        average_slot_time_ms: 0,
-        start_block_time: None,
-        current_block_time: None,
-    };
-
-
-    let epoch_info = cli_epoch_info.epoch_info.clone();
-    let average_slot_time_ms = rpc_client
-        .get_recent_performance_samples(Some(60)).await
-        .ok()
-        .and_then(|samples| {
-            let (slots, secs) = samples.iter().fold((0, 0), |(slots, secs), sample| {
-                (slots + sample.num_slots, secs + sample.sample_period_secs)
-            });
-            (secs as u64).saturating_mul(1000).checked_div(slots)
-        })
-        .unwrap_or(clock::DEFAULT_MS_PER_SLOT);
-    let epoch_expected_start_slot = epoch_info.absolute_slot - epoch_info.slot_index;
-    let first_block_in_epoch = rpc_client
-        .get_blocks_with_limit(epoch_expected_start_slot, 1).await
-        .ok()
-        .and_then(|slot_vec| slot_vec.first().cloned())
-        .unwrap_or(epoch_expected_start_slot);
-
-    let start_block_time =
-        rpc_client
-            .get_block_time(first_block_in_epoch).await
-            .ok()
-            .map(|time| {
-                time + (((first_block_in_epoch - epoch_expected_start_slot)
-                    * average_slot_time_ms)
-                    / 1000) as i64
-            });
-    let current_block_time = rpc_client.get_block_time(epoch_info.absolute_slot).await.ok();
-
-    let current_slot = epoch_info.absolute_slot;
-    let current_block_time =
-        rpc_client
-            .get_block_time(current_slot).await
-            .ok()
-            .map(|time| {
-                time + (((first_block_in_epoch - epoch_expected_start_slot)
-                    * average_slot_time_ms)
-                    / 1000) as i64
-            });
-    let timeo = Utc.timestamp_opt(current_block_time.unwrap() as i64, 0).unwrap();
-
-    println!("current_block_time: {} -> at {:?}", current_block_time.unwrap(), timeo);
-
-    println!("average_slot_time_ms: {}", average_slot_time_ms);
-
-    cli_epoch_info.average_slot_time_ms = average_slot_time_ms;
-    cli_epoch_info.start_block_time = start_block_time;
-    cli_epoch_info.current_block_time = current_block_time;
-
-
-    cli_epoch_info
 }
