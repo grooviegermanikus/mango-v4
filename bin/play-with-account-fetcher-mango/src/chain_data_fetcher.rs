@@ -1,12 +1,13 @@
+//! Client utility to interact with Solana chain via RPC.
+//!
+//! The retrieved data will be deserialized using anchor types.
+//! No dependency to Mango Types are allowed; use `mango_chain_data_fetcher.rs` instead.
+
+
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anchor_lang::Discriminator;
-
-use fixed::types::I80F48;
-use mango_v4::accounts_zerocopy::{KeyedAccountSharedData, LoadZeroCopy};
-use mango_v4::state::{Bank, MangoAccount, MangoAccountValue};
 
 use anyhow::Context;
 use mango_feeds_connector::chain_data::*;
@@ -16,6 +17,7 @@ use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
+use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use crate::account_fetcher_trait::AccountFetcher;
 
 /// A complex account fetcher that mostly depends on an external job keeping
@@ -43,13 +45,6 @@ impl ChainDataFetcher {
             .with_context(|| format!("loading account {}", address))?)
     }
 
-
-    pub fn fetch_bank_price(&self, bank: &Pubkey) -> anyhow::Result<I80F48> {
-        let bank: Bank = self.fetch(bank)?;
-        let oracle = self.fetch_raw(&bank.oracle)?;
-        let price = bank.oracle_price(&KeyedAccountSharedData::new(bank.oracle, oracle), None)?;
-        Ok(price)
-    }
 
     // fetches via RPC, stores in ChainData, returns new version
     pub async fn fetch_fresh<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
