@@ -10,7 +10,7 @@ use mango_v4::{
     i80f48::ClampToInt,
     state::{Bank, MangoAccountValue, TokenConditionalSwap, TokenIndex},
 };
-use mango_v4_client::{chain_data, health_cache, jupiter, MangoClient, MangoGroupContext};
+use mango_v4_client::{account_fetcher, health_cache, jupiter, MangoClient, MangoGroupContext};
 
 use solana_sdk::signature::Signature;
 use tracing::*;
@@ -40,7 +40,7 @@ pub struct Config {
 
 fn tcs_is_in_price_range(
     context: &MangoGroupContext,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     tcs: &TokenConditionalSwap,
 ) -> anyhow::Result<bool> {
     let buy_bank = context.mint_info(tcs.buy_token_index).first_bank();
@@ -80,7 +80,7 @@ fn tcs_has_plausible_premium(
 
 fn tcs_is_interesting(
     context: &MangoGroupContext,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     tcs: &TokenConditionalSwap,
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
     now_ts: u64,
@@ -94,7 +94,7 @@ fn tcs_is_interesting(
 fn tcs_max_volume(
     account: &MangoAccountValue,
     mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     tcs: &TokenConditionalSwap,
 ) -> anyhow::Result<Option<u64>> {
     let buy_bank_pk = mango_client
@@ -133,7 +133,7 @@ fn tcs_max_volume(
 fn tcs_max_liqee_execution(
     account: &MangoAccountValue,
     mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     tcs: &TokenConditionalSwap,
 ) -> anyhow::Result<Option<(u64, u64)>> {
     let buy_bank_pk = mango_client
@@ -230,7 +230,7 @@ fn tcs_max_liqee_execution(
 pub fn find_interesting_tcs_for_account(
     pubkey: &Pubkey,
     mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
     now_ts: u64,
 ) -> anyhow::Result<Vec<anyhow::Result<(Pubkey, u64, u64)>>> {
@@ -272,7 +272,7 @@ struct PreparedExecution {
 #[allow(clippy::too_many_arguments)]
 async fn prepare_token_conditional_swap(
     mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
     pubkey: &Pubkey,
     tcs_id: u64,
@@ -313,7 +313,7 @@ async fn prepare_token_conditional_swap(
 #[allow(clippy::too_many_arguments)]
 async fn prepare_token_conditional_swap_inner(
     mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
     pubkey: &Pubkey,
     liqee_old: &MangoAccountValue,
@@ -365,7 +365,7 @@ async fn prepare_token_conditional_swap_inner(
 #[instrument(skip_all, fields(%pubkey, tcs_id = tcs.id))]
 async fn prepare_token_conditional_swap_inner2(
     mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     pubkey: &Pubkey,
     config: &Config,
     liqee: &MangoAccountValue,
@@ -483,7 +483,7 @@ async fn prepare_token_conditional_swap_inner2(
 #[derive(Clone)]
 pub struct ExecutionContext {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data::AccountFetcher>,
+    pub account_fetcher: Arc<account_fetcher::AccountFetcher>,
     pub token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     pub config: Config,
 }

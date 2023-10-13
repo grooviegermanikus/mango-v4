@@ -1,6 +1,9 @@
-use crate::{AccountFetcher, MangoGroupContext};
+use crate::{MangoGroupContext};
+// use crate::{AccountFetcher, MangoGroupContext};
 use anyhow::Context;
 use futures::{stream, StreamExt, TryStreamExt};
+use mango_feeds_connector::account_fetcher_trait::{AccountFetcher, AccountFetcherSync};
+use mango_feeds_connector::chain_data_fetcher;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{FixedOrderAccountRetriever, HealthCache};
 use mango_v4::state::MangoAccountValue;
@@ -38,7 +41,7 @@ pub async fn new(
 
 pub fn new_sync(
     context: &MangoGroupContext,
-    account_fetcher: &crate::chain_data::AccountFetcher,
+    account_fetcher: &dyn AccountFetcherSync,
     account: &MangoAccountValue,
 ) -> anyhow::Result<HealthCache> {
     let active_token_len = account.active_token_positions().count();
@@ -51,7 +54,7 @@ pub fn new_sync(
         .map(|meta| {
             Ok(KeyedAccountSharedData::new(
                 meta.pubkey,
-                account_fetcher.fetch_raw(&meta.pubkey)?,
+                account_fetcher.fetch_raw_account_sync(&meta.pubkey)?,
             ))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;

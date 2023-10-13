@@ -4,7 +4,7 @@ use mango_v4::state::{
     Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
+    account_fetcher, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
     TransactionBuilder, TransactionSize,
 };
 
@@ -30,14 +30,14 @@ pub struct Config {
 
 fn token_bank(
     token: &TokenContext,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
 ) -> anyhow::Result<Bank> {
     account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())
 }
 
 pub struct Rebalancer {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data::AccountFetcher>,
+    pub account_fetcher: Arc<account_fetcher::AccountFetcher>,
     pub mango_account_address: Pubkey,
     pub config: Config,
 }

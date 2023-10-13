@@ -1,12 +1,11 @@
-pub use account_fetcher::*;
+// pub use account_fetcher::*;
 pub use client::*;
 pub use context::*;
 pub use util::*;
 
-mod account_fetcher;
+// mod account_fetcher;
 pub mod account_update_stream;
-pub mod chain_data;
-mod chain_data_fetcher;
+// pub mod account_fetcher;
 mod client;
 mod context;
 mod gpa;
@@ -16,3 +15,10 @@ pub mod perp_pnl;
 pub mod snapshot_source;
 mod util;
 pub mod websocket_source;
+pub mod mango_account_fetcher;
+pub mod mango_chain_data_fetcher;
+pub use mango_feeds_connector::account_fetcher_trait::{AccountFetcher, AccountFetcherSync};
+pub use mango_feeds_connector::account_fetcher;
+pub use mango_feeds_connector::chain_data;
+pub use mango_feeds_connector::chain_data_fetcher;
+

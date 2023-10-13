@@ -6,7 +6,7 @@ use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
+    account_update_stream, account_fetcher, keypair_from_cli, snapshot_source, websocket_source,
     AsyncChannelSendUnlessFull, Client, MangoClient, MangoGroupContext, TransactionBuilderConfig,
 };
 use tracing::*;
@@ -102,9 +102,9 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // The representation of current on-chain account data
-    let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
+    let chain_data = Arc::new(RwLock::new(account_fetcher::ChainData::new()));
     // Reading accounts from chain_data
-    let account_fetcher = Arc::new(chain_data::AccountFetcher {
+    let account_fetcher = Arc::new(account_fetcher::AccountFetcher {
         chain_data: chain_data.clone(),
         rpc: client.rpc_async(),
     });
@@ -349,7 +349,7 @@ struct SharedState {
     health_check_all: bool,
 }
 
-fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
+fn start_chain_data_metrics(chain: Arc<RwLock<account_fetcher::ChainData>>, metrics: &metrics::Metrics) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(600));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());

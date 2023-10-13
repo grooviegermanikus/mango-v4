@@ -3,16 +3,15 @@
 //! This module contains the specific mango types.
 
 use anchor_lang::solana_program::address_lookup_table_account::AddressLookupTableAccount;
-use anchor_lang::solana_program::example_mocks::solana_address_lookup_table_program::state::AddressLookupTable;
 use anyhow::Context;
 use futures::{stream, StreamExt, TryStreamExt};
+use mango_feeds_connector::account_fetcher::fetch_address_lookup_table;
+use mango_feeds_connector::account_fetcher_trait::AccountFetcher;
 
 use solana_sdk::account::ReadableAccount;
 use solana_sdk::pubkey::Pubkey;
 
 use mango_v4::state::MangoAccountValue;
-use crate::account_fetcher::fetch_address_lookup_table;
-use crate::account_fetcher_trait::AccountFetcher;
 
 
 // Can't be in the trait, since then it would no longer be object-safe...

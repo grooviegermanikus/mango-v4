@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use fixed::types::I80F48;
+use mango_feeds_connector::account_fetcher::account_fetcher_fetch_anchor_account;
+use mango_feeds_connector::account_fetcher_trait::AccountFetcher;
 use solana_sdk::account::ReadableAccount;
 
 use crate::*;

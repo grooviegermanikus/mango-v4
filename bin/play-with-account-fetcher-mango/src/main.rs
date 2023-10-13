@@ -1,8 +1,3 @@
-mod account_fetcher_trait;
-mod account_fetcher;
-mod mango_account_fetcher;
-mod chain_data_fetcher;
-mod mango_chain_data_fetcher;
 
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
@@ -10,9 +5,10 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use anchor_lang::Key;
 use chrono::{TimeZone, Utc};
 use futures_util::TryFutureExt;
-use mango_feeds_connector::chain_data;
+use mango_feeds_connector::{account_fetcher, chain_data, chain_data_fetcher};
+use mango_feeds_connector::account_fetcher::{CachedAccountFetcher, RpcAccountFetcher};
+use mango_feeds_connector::account_fetcher_trait::AccountFetcher;
 use tracing::{info, trace};
-use account_fetcher::{CachedAccountFetcher, RpcAccountFetcher};
 use solana_client::nonblocking::rpc_client::{RpcClient as RpcClientAsync, RpcClient};
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::clock;
@@ -20,7 +16,7 @@ use solana_sdk::clock::UnixTimestamp;
 use solana_sdk::epoch_info::EpochInfo;
 use solana_sdk::pubkey::Pubkey;
 use mango_v4::state::{MangoAccountValue, PerpMarket};
-use crate::account_fetcher_trait::AccountFetcher;
+use mango_v4_client::mango_account_fetcher;
 
 
 #[tokio::main]

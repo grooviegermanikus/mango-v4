@@ -6,7 +6,7 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthType;
 use mango_v4::state::{PerpMarket, PerpMarketIndex};
 use mango_v4_client::{
-    chain_data, health_cache, prettify_solana_client_error, MangoClient, TransactionBuilder,
+    account_fetcher, health_cache, prettify_solana_client_error, MangoClient, TransactionBuilder,
 };
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -25,7 +25,7 @@ pub struct Config {
 
 fn perp_markets_and_prices(
     mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
 ) -> HashMap<PerpMarketIndex, (PerpMarket, I80F48)> {
     mango_client
         .context
@@ -55,7 +55,7 @@ fn perp_markets_and_prices(
 
 pub struct SettlementState {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data::AccountFetcher>,
+    pub account_fetcher: Arc<account_fetcher::AccountFetcher>,
     pub config: Config,
 
     pub recently_settled: HashMap<Pubkey, Instant>,
@@ -240,7 +240,7 @@ impl SettlementState {
 
 struct SettleBatchProcessor<'a> {
     mango_client: &'a MangoClient,
-    account_fetcher: &'a chain_data::AccountFetcher,
+    account_fetcher: &'a account_fetcher::AccountFetcher,
     perp_market_index: PerpMarketIndex,
     instructions: Vec<Instruction>,
     max_batch_size: usize,

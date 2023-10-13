@@ -8,7 +8,7 @@ use solana_sdk::account::AccountSharedData;
 use solana_sdk::pubkey::Pubkey;
 
 pub use mango_v4_client::snapshot_source::is_mango_account;
-use mango_v4_client::{chain_data, MangoClient};
+use mango_v4_client::{account_fetcher, MangoClient};
 
 pub fn is_mango_bank<'a>(account: &'a AccountSharedData, group_id: &Pubkey) -> Option<&'a Bank> {
     let bank = account.load::<Bank>().ok()?;
@@ -40,7 +40,7 @@ pub fn is_perp_market<'a>(
 /// Convenience wrapper for getting max swap amounts for a token pair
 pub fn max_swap_source(
     client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     account: &MangoAccountValue,
     source: TokenIndex,
     target: TokenIndex,
@@ -81,7 +81,7 @@ pub fn max_swap_source(
 /// Convenience wrapper for getting max swap amounts for a token pair
 pub fn max_swap_source_ignore_net_borrows(
     client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &account_fetcher::AccountFetcher,
     account: &MangoAccountValue,
     source: TokenIndex,
     target: TokenIndex,

@@ -21,7 +21,7 @@ use fixed::types::I80F48;
 use mango_feeds_connector::metrics::*;
 use mango_v4::state::{MangoAccount, MangoAccountValue, PerpMarketIndex};
 use mango_v4_client::{
-    chain_data, health_cache, AccountFetcher, Client, MangoGroupContext, TransactionBuilderConfig,
+    account_fetcher, health_cache, AccountFetcher, Client, MangoGroupContext, TransactionBuilderConfig,
 };
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::{account::ReadableAccount, signature::Keypair};
@@ -273,8 +273,8 @@ async fn main() -> anyhow::Result<()> {
         )
         .await?,
     );
-    let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
-    let account_fetcher = Arc::new(chain_data::AccountFetcher {
+    let chain_data = Arc::new(RwLock::new(account_fetcher::ChainData::new()));
+    let account_fetcher = Arc::new(account_fetcher::AccountFetcher {
         chain_data: chain_data.clone(),
         rpc: client.rpc_async(),
     });

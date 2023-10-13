@@ -11,7 +11,9 @@ path = "src/main.rs"
 anchor-lang = { workspace = true }
 anchor-client = { workspace = true }
 
-mango-feeds-connector = "0.2.0"
+mango-v4-client = { path = "../../lib/client" }
+mango-feeds-connector = { workspace = true }
+#mango-feeds-connector = "0.2.0"
 
 fixed = { workspace = true, features = ["serde", "borsh"] }
 

@@ -2,9 +2,11 @@ use solana_client::rpc_response::{Response, RpcKeyedAccount};
 use solana_sdk::{account::AccountSharedData, pubkey::Pubkey};
 
 use std::{str::FromStr, sync::Arc};
+use mango_feeds_connector::chain_data::AccountData;
+use mango_feeds_connector::*;
 use tracing::*;
 
-use crate::chain_data;
+// use crate::account_fetcher;
 
 #[derive(Clone)]
 pub struct AccountUpdate {
@@ -38,7 +40,8 @@ pub enum Message {
 
 impl Message {
     pub fn update_chain_data(&self, chain: &mut chain_data::ChainData) {
-        use chain_data::*;
+        use mango_feeds_connector::account_fetcher::*;
+        use mango_feeds_connector::chain_data::*;
         match self {
             Message::Account(account_write) => {
                 trace!("websocket account message");
@@ -55,7 +58,7 @@ impl Message {
                 for account_update in snapshot {
                     chain.update_account(
                         account_update.pubkey,
-                        chain_data::AccountData {
+                        AccountData {
                             slot: account_update.slot,
                             account: account_update.account.clone(),
                             write_version: 0,
