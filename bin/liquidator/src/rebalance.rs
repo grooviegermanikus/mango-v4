@@ -3,10 +3,8 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, QUOTE_TOKEN_INDEX,
 };
-use mango_v4_client::{
-    account_fetcher, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
-    TransactionBuilder, TransactionSize,
-};
+use mango_v4_client::{jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext, TransactionBuilder, TransactionSize};
+use mango_v4_client::account_fetchers;
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
@@ -14,6 +12,9 @@ use solana_sdk::signature::Signature;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
+use mango_v4_client::account_fetchers::{AccountFetcherSync, MangoChainDataFetcher};
+use mango_v4_client::mango_account_repository::MangoAccountRepository;
+use mango_v4_client::mango_chain_data_fetcher::account_fetch_and_map;
 
 #[derive(Clone)]
 pub struct Config {
@@ -30,14 +31,14 @@ pub struct Config {
 
 fn token_bank(
     token: &TokenContext,
-    account_fetcher: &account_fetcher::AccountFetcher,
+    account_fetcher: &MangoAccountRepository,
 ) -> anyhow::Result<Bank> {
     account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())
 }
 
 pub struct Rebalancer {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<account_fetcher::AccountFetcher>,
+    pub account_fetcher: Arc<MangoAccountRepository>,
     pub mango_account_address: Pubkey,
     pub config: Config,
 }
@@ -438,7 +439,7 @@ impl Rebalancer {
 
         if effective_lots != 0 {
             // send an ioc order to reduce the base position
-            let oracle_account_data = self.account_fetcher.fetch_raw(&perp.market.oracle)?;
+            let oracle_account_data = self.account_fetcher.fetch_raw_account_sync(&perp.market.oracle)?;
             let oracle_account =
                 KeyedAccountSharedData::new(perp.market.oracle, oracle_account_data);
             let oracle_price = perp.market.oracle_price(&oracle_account, None)?;

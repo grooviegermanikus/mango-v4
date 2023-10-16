@@ -6,16 +6,16 @@ use std::time::{Duration, Instant};
 use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
-use mango_v4_client::{
-    account_update_stream, account_fetcher, jupiter, keypair_from_cli, snapshot_source,
-    websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
-    TransactionBuilderConfig,
-};
+use mango_v4_client::{account_update_stream, jupiter, keypair_from_cli, snapshot_source, websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext, TransactionBuilderConfig, account_fetchers};
 
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
+use tokio_tungstenite::tungstenite::client::client_with_config;
 use tracing::*;
+use mango_v4_client::account_fetchers::{AccountFetcher, AccountFetcherSync, ChainDataFetcher};
+use mango_v4_client::mango_account_repository::MangoAccountRepository;
+use mango_v4_client::mango_chain_data_fetcher::MangoChainDataFetcher;
 
 pub mod liquidate;
 pub mod metrics;
@@ -165,12 +165,9 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // The representation of current on-chain account data
-    let chain_data = Arc::new(RwLock::new(account_fetcher::ChainData::new()));
+    let chain_data = Arc::new(RwLock::new(account_fetchers::ChainData::new()));
     // Reading accounts from chain_data
-    let account_fetcher = Arc::new(account_fetcher::AccountFetcher {
-        chain_data: chain_data.clone(),
-        rpc: client.rpc_async(),
-    });
+    let account_fetcher = Arc::new(MangoAccountRepository::new(chain_data, client.rpc_async()));
 
     let mango_account = account_fetcher
         .fetch_fresh_mango_account(&cli.liqor_mango_account)
@@ -303,9 +300,9 @@ async fn main() -> anyhow::Result<()> {
 
     let mut liquidation = Box::new(LiquidationState {
         mango_client: mango_client.clone(),
-        account_fetcher,
-        liquidation_config: liq_config,
-        trigger_tcs_config: tcs_config,
+        account_fetcher: account_fetcher.clone(),
+        liquidation_config: liq_config.clone(),
+        trigger_tcs_config: tcs_config.clone(),
         rebalancer: rebalancer.clone(),
         token_swap_info: token_swap_info_updater.clone(),
         liq_errors: ErrorTracking {
@@ -424,7 +421,74 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let liquidation_job = tokio::spawn({
+    {
+
+        let mut liqqq = Box::new(LiquidationStateMini {
+            mango_client: mango_client.clone(),
+            account_fetcher: account_fetcher.clone(),
+            liquidation_config: liq_config,
+            trigger_tcs_config: tcs_config,
+            rebalancer: rebalancer.clone(),
+            token_swap_info: token_swap_info_updater.clone(),
+            liq_errors: ErrorTracking {
+                skip_threshold: 5,
+                skip_duration: Duration::from_secs(120),
+                ..ErrorTracking::default()
+            },
+            tcs_collection_hard_errors: ErrorTracking {
+                skip_threshold: 2,
+                skip_duration: Duration::from_secs(120),
+                ..ErrorTracking::default()
+            },
+            tcs_collection_partial_errors: ErrorTracking {
+                skip_threshold: 2,
+                skip_duration: Duration::from_secs(120),
+                ..ErrorTracking::default()
+            },
+            tcs_execution_errors: ErrorTracking {
+                skip_threshold: 2,
+                skip_duration: Duration::from_secs(120),
+                ..ErrorTracking::default()
+            },
+            persistent_error_report_interval: Duration::from_secs(300),
+            persistent_error_min_duration: Duration::from_secs(300),
+            last_persistent_error_report: Instant::now(),
+        });
+
+        tokio::spawn({
+            let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
+            let shared_state = shared_state.clone();
+            async move {
+                loop {
+                    interval.tick().await;
+
+                    let account_addresses = {
+                        let state = shared_state.write().unwrap();
+                        if !state.one_snapshot_done {
+                            continue;
+                        }
+                        state.mango_accounts.iter().cloned().collect_vec()
+                    };
+
+                    // liquidation.log_persistent_errors();
+                    //
+                    // let liquidated = liquidation
+                    //     .maybe_liquidate_one_and_rebalance(account_addresses.iter())
+                    //     .await
+                    //     .unwrap();
+                    //
+                    // if !liquidated {
+                    //     liquidation
+                    //         .maybe_take_token_conditional_swap(account_addresses.iter())
+                    //         .await
+                    //         .unwrap();
+                    // }
+                }
+            }
+        });
+    }
+
+    let liquidation_job = tokio::spawn( {
         let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
@@ -439,14 +503,15 @@ async fn main() -> anyhow::Result<()> {
                     state.mango_accounts.iter().cloned().collect_vec()
                 };
 
-                liquidation.log_persistent_errors();
+                // liquidation.log_persistent_errors();
+                //
+                // let liquidated = liquidation
+                //     .maybe_liquidate_one_and_rebalance(account_addresses.iter())
+                //     .await
+                //     .unwrap();
 
-                let liquidated = liquidation
-                    .maybe_liquidate_one_and_rebalance(account_addresses.iter())
-                    .await
-                    .unwrap();
-
-                if !liquidated {
+                // if !liquidated {
+                {
                     liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
@@ -593,7 +658,7 @@ impl ErrorTracking {
 
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
-    account_fetcher: Arc<account_fetcher::AccountFetcher>,
+    account_fetcher: Arc<MangoAccountRepository>,
     rebalancer: Arc<rebalance::Rebalancer>,
     token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,
@@ -608,6 +673,35 @@ struct LiquidationState {
     persistent_error_report_interval: Duration,
     last_persistent_error_report: Instant,
     persistent_error_min_duration: Duration,
+}
+
+
+struct LiquidationStateMini {
+    mango_client: Arc<MangoClient>,
+    account_fetcher: Arc<MangoAccountRepository>,
+    rebalancer: Arc<rebalance::Rebalancer>,
+    token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
+    liquidation_config: liquidate::Config,
+    trigger_tcs_config: trigger_tcs::Config,
+
+    liq_errors: ErrorTracking,
+    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
+    tcs_collection_hard_errors: ErrorTracking,
+    /// Recording errors when some tcs have errors during collection but others don't
+    tcs_collection_partial_errors: ErrorTracking,
+    tcs_execution_errors: ErrorTracking,
+    persistent_error_report_interval: Duration,
+    last_persistent_error_report: Instant,
+    persistent_error_min_duration: Duration,
+}
+
+impl LiquidationStateMini {
+    async fn maybe_take_token_conditional_swap<'b>(
+        &mut self,
+        accounts_iter: impl Iterator<Item = &'b Pubkey>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 impl LiquidationState {
@@ -660,7 +754,7 @@ impl LiquidationState {
 
         let result = liquidate::maybe_liquidate_account(
             &self.mango_client,
-            &self.account_fetcher,
+            self.account_fetcher.as_ref(),
             pubkey,
             &self.liquidation_config,
         )
@@ -727,7 +821,7 @@ impl LiquidationState {
             match trigger_tcs::find_interesting_tcs_for_account(
                 pubkey,
                 &self.mango_client,
-                &self.account_fetcher,
+                self.account_fetcher.as_ref(),
                 &self.token_swap_info,
                 now_ts,
             ) {
@@ -813,7 +907,7 @@ impl LiquidationState {
     }
 }
 
-fn start_chain_data_metrics(chain: Arc<RwLock<account_fetcher::ChainData>>, metrics: &metrics::Metrics) {
+fn start_chain_data_metrics(chain: Arc<RwLock<account_fetchers::ChainData>>, metrics: &metrics::Metrics) {
     let mut interval = tokio::time::interval(Duration::from_secs(600));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());

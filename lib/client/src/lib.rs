@@ -15,10 +15,9 @@ pub mod perp_pnl;
 pub mod snapshot_source;
 mod util;
 pub mod websocket_source;
+pub mod account_fetchers;
+
 pub mod mango_account_fetcher;
 pub mod mango_chain_data_fetcher;
-pub use mango_feeds_connector::account_fetcher_trait::{AccountFetcher, AccountFetcherSync};
-pub use mango_feeds_connector::account_fetcher;
-pub use mango_feeds_connector::chain_data;
-pub use mango_feeds_connector::chain_data_fetcher;
+pub mod mango_account_repository;
 

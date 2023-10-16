@@ -1,16 +1,19 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Duration;
 
 use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
-use mango_v4_client::{account_fetcher, AccountFetcherSync, health_cache, MangoClient};
+use mango_v4_client::{account_fetchers, health_cache, MangoClient};
+use mango_v4_client::account_fetchers::{account_fetcher_fetch_mango_account, account_fetcher_sync_fetch_mango_account, AccountFetcher, AccountFetcherSync, MangoChainDataFetcher, wrap_account_fetcher_async};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
 use rand::seq::SliceRandom;
 use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
+use mango_v4_client::mango_account_repository::MangoAccountRepository;
 
 use crate::util;
 
@@ -23,7 +26,7 @@ pub struct Config {
 
 struct LiquidateHelper<'a> {
     client: &'a MangoClient,
-    account_fetcher: &'a dyn AccountFetcherSync,
+    account_fetcher: &'a MangoAccountRepository,
     pubkey: &'a Pubkey,
     liqee: &'a MangoAccountValue,
     health_cache: &'a HealthCache,
@@ -41,7 +44,7 @@ impl<'a> LiquidateHelper<'a> {
             .liqee
             .active_serum3_orders()
             .map(|orders| {
-                let open_orders_account = self.account_fetcher.fetch_raw(&orders.open_orders)?;
+                let open_orders_account = self.account_fetcher.fetch_raw_account_sync(&orders.open_orders)?;
                 let open_orders = mango_v4::serum3_cpi::load_open_orders(&open_orders_account)?;
                 Ok((*orders, *open_orders))
             })
@@ -155,14 +158,12 @@ impl<'a> LiquidateHelper<'a> {
         // in the market before agreeding to take it over. Also, the liqor should check how much
         // settle limit it's going to get along with the unsettled pnl.
         let (max_base_transfer_abs, max_pnl_transfer) = {
-            let mut liqor = self
-                .account_fetcher
-                .fetch_fresh_mango_account(&self.client.mango_account_address)
-                .await
+            let mut liqor =  account_fetcher_sync_fetch_mango_account(self
+                .account_fetcher, &self.client.mango_account_address)
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
             let mut health_cache =
-                health_cache::new(&self.client.context, self.account_fetcher, &liqor)
+                health_cache::new(&self.client.context, wrap_account_fetcher_async(self.account_fetcher).as_ref(), &liqor)
                     .await
                     .expect("always ok");
             let quote_bank = self
@@ -537,7 +538,7 @@ impl<'a> LiquidateHelper<'a> {
 #[allow(clippy::too_many_arguments)]
 pub async fn maybe_liquidate_account(
     mango_client: &MangoClient,
-    account_fetcher: &account_fetcher::AccountFetcher,
+    account_fetcher: &MangoAccountRepository,
     pubkey: &Pubkey,
     config: &Config,
 ) -> anyhow::Result<bool> {
@@ -561,7 +562,7 @@ pub async fn maybe_liquidate_account(
     // Fetch a fresh account and re-compute
     // This is -- unfortunately -- needed because the websocket streams seem to not
     // be great at providing timely updates to the account data.
-    let account = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
+    let account = account_fetcher_fetch_mango_account(account_fetcher, pubkey).await?;
     let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
         .await
         .context("creating health cache 2")?;

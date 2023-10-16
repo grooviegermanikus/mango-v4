@@ -10,7 +10,7 @@ use mango_v4::state::MangoAccountValue;
 
 pub async fn new(
     context: &MangoGroupContext,
-    account_fetcher: &impl AccountFetcher,
+    account_fetcher: &dyn AccountFetcher,
     account: &MangoAccountValue,
 ) -> anyhow::Result<HealthCache> {
     let active_token_len = account.active_token_positions().count();
