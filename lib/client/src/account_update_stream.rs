@@ -40,7 +40,6 @@ pub enum Message {
 
 impl Message {
     pub fn update_chain_data(&self, chain: &mut chain_data::ChainData) {
-        use mango_feeds_connector::account_fetcher::*;
         use mango_feeds_connector::chain_data::*;
         match self {
             Message::Account(account_write) => {

@@ -19,6 +19,13 @@ use mango_v4::accounts_zerocopy::{KeyedAccountSharedData, LoadZeroCopy};
 #[async_trait::async_trait]
 pub trait MangoChainDataFetcher: AccountFetcherSync {
 
+    // Can't be in the trait, since then it would no longer be object-safe...
+    async fn fetch_mango_account(
+        fetcher: &dyn AccountFetcher,
+        address: &Pubkey,
+    ) -> anyhow::Result<MangoAccountValue>;
+
+
     // async fn fetch_bank_price(&self, bank: &Pubkey) -> anyhow::Result<I80F48>;
     //
     // fn fetch_mango_account(&self, address: &Pubkey) -> anyhow::Result<MangoAccountValue>;

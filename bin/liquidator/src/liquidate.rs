@@ -6,7 +6,7 @@ use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
 use mango_v4_client::{account_fetchers, health_cache, MangoClient};
-use mango_v4_client::account_fetchers::{account_fetcher_fetch_mango_account, account_fetcher_sync_fetch_mango_account, AccountFetcher, AccountFetcherSync, MangoChainDataFetcher, wrap_account_fetcher_async};
+use mango_v4_client::account_fetchers::{account_fetcher_fetch_mango_account, account_fetcher_sync_fetch_mango_account, AccountFetcher, AccountFetcherPlus, MangoChainDataFetcher};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
@@ -26,7 +26,7 @@ pub struct Config {
 
 struct LiquidateHelper<'a> {
     client: &'a MangoClient,
-    account_fetcher: &'a MangoAccountRepository,
+    account_fetcher: &'a dyn AccountFetcherPlus,
     pubkey: &'a Pubkey,
     liqee: &'a MangoAccountValue,
     health_cache: &'a HealthCache,
@@ -163,7 +163,7 @@ impl<'a> LiquidateHelper<'a> {
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
             let mut health_cache =
-                health_cache::new(&self.client.context, wrap_account_fetcher_async(self.account_fetcher).as_ref(), &liqor)
+                health_cache::new(&self.client.context, self.account_fetcher, &liqor)
                     .await
                     .expect("always ok");
             let quote_bank = self
@@ -538,7 +538,7 @@ impl<'a> LiquidateHelper<'a> {
 #[allow(clippy::too_many_arguments)]
 pub async fn maybe_liquidate_account(
     mango_client: &MangoClient,
-    account_fetcher: &MangoAccountRepository,
+    account_fetcher: &dyn AccountFetcherPlus,
     pubkey: &Pubkey,
     config: &Config,
 ) -> anyhow::Result<bool> {

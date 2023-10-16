@@ -367,7 +367,7 @@ async fn prepare_token_conditional_swap_inner(
 #[instrument(skip_all, fields(%pubkey, tcs_id = tcs.id))]
 async fn prepare_token_conditional_swap_inner2(
     mango_client: &MangoClient,
-    account_fetcher: &account_fetcher::AccountFetcher,
+    account_fetcher: &impl account_fetchers::AccountFetcherPlus,
     pubkey: &Pubkey,
     config: &Config,
     liqee: &MangoAccountValue,

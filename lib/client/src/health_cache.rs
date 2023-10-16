@@ -3,14 +3,14 @@ use crate::{MangoGroupContext};
 use anyhow::Context;
 use futures::{stream, StreamExt, TryStreamExt};
 use mango_feeds_connector::account_fetcher_trait::{AccountFetcher, AccountFetcherSync};
-use mango_feeds_connector::chain_data_fetcher;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{FixedOrderAccountRetriever, HealthCache};
 use mango_v4::state::MangoAccountValue;
+use crate::account_fetchers::AccountFetcherPlus;
 
 pub async fn new(
     context: &MangoGroupContext,
-    account_fetcher: &dyn AccountFetcher,
+    account_fetcher: &dyn AccountFetcherPlus,
     account: &MangoAccountValue,
 ) -> anyhow::Result<HealthCache> {
     let active_token_len = account.active_token_positions().count();
@@ -41,7 +41,7 @@ pub async fn new(
 
 pub fn new_sync(
     context: &MangoGroupContext,
-    account_fetcher: &dyn AccountFetcherSync,
+    account_fetcher: &impl AccountFetcherSync,
     account: &MangoAccountValue,
 ) -> anyhow::Result<HealthCache> {
     let active_token_len = account.active_token_positions().count();

@@ -11,9 +11,10 @@ use mango_v4_client::{account_update_stream, jupiter, keypair_from_cli, snapshot
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
+use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::client::client_with_config;
 use tracing::*;
-use mango_v4_client::account_fetchers::{AccountFetcher, AccountFetcherSync, ChainDataFetcher};
+use mango_v4_client::account_fetchers::{AccountFetcherPlus, ChainDataFetcher};
 use mango_v4_client::mango_account_repository::MangoAccountRepository;
 use mango_v4_client::mango_chain_data_fetcher::MangoChainDataFetcher;
 
@@ -455,37 +456,6 @@ async fn main() -> anyhow::Result<()> {
             last_persistent_error_report: Instant::now(),
         });
 
-        tokio::spawn({
-            let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
-            let shared_state = shared_state.clone();
-            async move {
-                loop {
-                    interval.tick().await;
-
-                    let account_addresses = {
-                        let state = shared_state.write().unwrap();
-                        if !state.one_snapshot_done {
-                            continue;
-                        }
-                        state.mango_accounts.iter().cloned().collect_vec()
-                    };
-
-                    // liquidation.log_persistent_errors();
-                    //
-                    // let liquidated = liquidation
-                    //     .maybe_liquidate_one_and_rebalance(account_addresses.iter())
-                    //     .await
-                    //     .unwrap();
-                    //
-                    // if !liquidated {
-                    //     liquidation
-                    //         .maybe_take_token_conditional_swap(account_addresses.iter())
-                    //         .await
-                    //         .unwrap();
-                    // }
-                }
-            }
-        });
     }
 
     let liquidation_job = tokio::spawn( {
@@ -503,15 +473,14 @@ async fn main() -> anyhow::Result<()> {
                     state.mango_accounts.iter().cloned().collect_vec()
                 };
 
-                // liquidation.log_persistent_errors();
-                //
-                // let liquidated = liquidation
-                //     .maybe_liquidate_one_and_rebalance(account_addresses.iter())
-                //     .await
-                //     .unwrap();
+                liquidation.log_persistent_errors();
 
-                // if !liquidated {
-                {
+                let liquidated = liquidation
+                    .maybe_liquidate_one_and_rebalance(account_addresses.iter())
+                    .await
+                    .unwrap();
+
+                if !liquidated {
                     liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
@@ -658,7 +627,7 @@ impl ErrorTracking {
 
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
-    account_fetcher: Arc<MangoAccountRepository>,
+    account_fetcher: Arc<dyn AccountFetcherPlus>,
     rebalancer: Arc<rebalance::Rebalancer>,
     token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,

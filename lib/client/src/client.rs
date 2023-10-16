@@ -39,12 +39,14 @@ use crate::{jupiter, util};
 use anyhow::Context;
 use mango_feeds_connector::account_fetcher::{account_fetcher_fetch_anchor_account, CachedAccountFetcher, RpcAccountFetcher};
 use mango_feeds_connector::account_fetcher_trait::AccountFetcher;
+// use crate::account_fetchers::{account_fetcher_fetch_anchor_account, CachedAccountFetcher, RpcAccountFetcher};
+// use crate::account_fetchers::AccountFetcherPlus;
 use solana_sdk::account::ReadableAccount;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
-use crate::account_fetchers::account_fetcher_fetch_mango_account;
+use crate::mango_account_repository::MangoAccountRepository;
 
 pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
@@ -242,11 +244,14 @@ impl MangoClient {
         owner: Arc<Keypair>,
     ) -> anyhow::Result<Self> {
         let rpc = client.rpc_async();
+
+
         let account_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
             rpc,
         })));
+
         let mango_account =
-            account_fetcher_fetch_mango_account(&*account_fetcher, &account).await?;
+            account_fetcher.fetch_mango_account(account_fetcher, &account).await?;
         let group = mango_account.fixed.group;
         if mango_account.fixed.owner != owner.pubkey() {
             anyhow::bail!(

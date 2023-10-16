@@ -12,7 +12,7 @@ use solana_sdk::signature::Signature;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
-use mango_v4_client::account_fetchers::{AccountFetcherSync, MangoChainDataFetcher};
+use mango_v4_client::account_fetchers::{AccountFetcherPlus, MangoChainDataFetcher};
 use mango_v4_client::mango_account_repository::MangoAccountRepository;
 use mango_v4_client::mango_chain_data_fetcher::account_fetch_and_map;
 

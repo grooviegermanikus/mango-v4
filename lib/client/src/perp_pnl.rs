@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use fixed::types::I80F48;
-use mango_feeds_connector::account_fetcher::account_fetcher_fetch_anchor_account;
-use mango_feeds_connector::account_fetcher_trait::AccountFetcher;
+use crate::account_fetchers::account_fetcher_fetch_anchor_account;
+use crate::account_fetchers::AccountFetcherPlus;
 use solana_sdk::account::ReadableAccount;
 
 use crate::*;
@@ -19,7 +19,7 @@ pub enum Direction {
 /// Note: keep in sync with perp.ts:getSettlePnlCandidates
 pub async fn fetch_top(
     context: &crate::context::MangoGroupContext,
-    account_fetcher: &impl AccountFetcher,
+    account_fetcher: &impl account_fetchers::AccountFetcherPlus,
     perp_market_index: PerpMarketIndex,
     direction: Direction,
     count: usize,

@@ -21,7 +21,7 @@ use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use mango_v4::state::{Bank, MangoAccount, MangoAccountValue};
 
 pub struct MangoAccountRepository {
-    pub chain_data_fetcher: Arc<ChainDataFetcher>,
+    pub chain_data_fetcher: Arc<dyn AccountFetcher>,
     // pub rpc: &'a RpcClientAsync,
 }
 
