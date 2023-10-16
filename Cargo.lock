@@ -3247,13 +3247,18 @@ dependencies = [
 [[package]]
 name = "mango-feeds-connector"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c51f9dd65f5c5ce13a41aa099c7fd6f2462ad9bc0184333a348a4b683139f9d"
 dependencies = [
+ "anchor-client",
+ "anchor-lang",
  "anyhow",
+ "arrayref",
  "async-channel",
+ "async-once-cell",
  "async-trait",
+ "chrono",
  "futures 0.3.28",
+ "futures-core",
+ "futures-util",
  "itertools",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-core-client",
@@ -3262,11 +3267,13 @@ dependencies = [
  "serde",
  "serde_derive",
  "solana-account-decoder",
+ "solana-address-lookup-table-program",
  "solana-client",
  "solana-logger",
  "solana-rpc",
  "solana-sdk",
  "tokio",
+ "tracing",
  "warp",
  "yellowstone-grpc-client",
  "yellowstone-grpc-proto",
@@ -4513,7 +4520,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
-name = "play-with-account-fetcher"
+name = "play-with-account-fetcher-mango"
 version = "0.0.1"
 dependencies = [
  "anchor-client",
@@ -4531,6 +4538,7 @@ dependencies = [
  "chrono",
  "clap 3.2.25",
  "dotenv",
+ "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
  "futures 0.3.28",
  "futures-core",
  "futures-util",
@@ -4538,7 +4546,9 @@ dependencies = [
  "jemallocator",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-core-client",
+ "mango-feeds-connector",
  "mango-v4",
+ "mango-v4-client",
  "once_cell",
  "pyth-sdk-solana",
  "rand 0.7.3",
@@ -4548,6 +4558,7 @@ dependencies = [
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "shellexpand",
  "solana-account-decoder",
+ "solana-address-lookup-table-program",
  "solana-client",
  "solana-logger",
  "solana-rpc",
